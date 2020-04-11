@@ -7,22 +7,35 @@ import numpy as np
 from glob import glob
 from useful_functions import AutoVivification, get_vibrational_energy
 from pprint import pprint
-import matplotlib.pyplot as plt
 import os, sys
+from scipy.optimize import curve_fit
+from matplotlib import cm
+sys.path.append('../classes/')
+from parser_function import get_stable_site_vibrations, get_gas_vibrations, \
+                            get_coverage_details, diff_energies, \
+                            get_lowest_absolute_energies,\
+                            get_differential_energy
 import mpmath as mp
 from ase.thermochemistry import HarmonicThermo, IdealGasThermo
 from ase.io import read
 from ase.db import connect
-from matplotlib.ticker import FormatStrFormatter
-
 import matplotlib.pyplot as plt
-plt.rcParams["figure.figsize"] = (16.1, 10)
+from matplotlib.ticker import FormatStrFormatter
+sys.path.append('../classes/')
+from parser_class import ParseInfo
 
+# Gaussian for fitting purposes
 def gaussian(x, a, x0, sigma):
     # called by gaussian_tpd for use with curve fit
     values = a * np.exp( - (x - x0)**2 / ( 2* sigma**2))
     return values
 
+def log_scale(x, a, b):
+    return a * np.log(x * b)
+
+def linear_scale(x, a):
+    return a * x
+# Main function for the TPD plot
 def main(tpd_filename, temprange, tempmin, beta):
     # Running the class experimentalTPD
     expTPD = experimentalTPD(tpd_filename, temprange, tempmin, beta)
@@ -32,8 +45,13 @@ def main(tpd_filename, temprange, tempmin, beta):
     expTPD.get_desorption_energy()
 
     # Fit the temperature Ed plot
-    fit_Ed = np.polyfit(expTPD.temperature[0:-1], expTPD.Ed, 3)
-    p_Ed = np.poly1d(fit_Ed)
+    try:
+        popt, pcov = curve_fit(log_scale,expTPD.temperature[0:-1], expTPD.Ed, p0=[0.1, 1])#np.polyfit(expTPD.temperature[0:-1], expTPD.Ed, 2)
+        p_Ed = lambda x : log_scale(x, *popt)#np.poly1d(fit_Ed)
+    except (RuntimeError, ValueError):
+        popt, pcov = curve_fit(linear_scale,expTPD.temperature[0:-1], expTPD.Ed)#np.polyfit(expTPD.temperature[0:-1], expTPD.Ed, 2)
+        p_Ed = lambda x : linear_scale(x, *popt)#np.poly1d(fit_Ed)
+
     temp_range = np.linspace(min(expTPD.temperature), max(expTPD.temperature), 100)
     fit_gauss = gaussian(temp_range,*expTPD.popt)
 
@@ -46,83 +64,16 @@ def main(tpd_filename, temprange, tempmin, beta):
             'fit_gauss':fit_gauss,
             'temp_range':temp_range}
 
-
-def get_lowest_absolute_energies(lst_stat_CO, lst_stat_slab, largest_cell, COg):
-    for stat in lst_stat_CO:
-        cell_size = stat.cell_size
-        if cell_size == largest_cell:
-            energy_CO = stat.energy
-    for stat in lst_stat_slab:
-        cell_size = stat.cell_size
-        if cell_size == largest_cell:
-            energy_slab = stat.energy
-
-    return energy_CO - energy_slab - COg
-
-def get_states(stat, functional, cell):
+# get the states for a chosen config
+def get_states(stat, functional, cell, facet):
     # for a given database pick out all states
     allstates = []
-    for row in stat.select(functional=functional, cell_size=cell):
+    for row in stat.select(functional=functional, cell_size=cell, facets=facet):
         allstates.append(row.states)
     unique_states = np.unique(allstates)
     return unique_states
 
-def get_number_CO(atoms):
-    nC = [ atom.index for atom in atoms if atom.symbol == 'C']
-    return len(nC)
-
-def monotonic(x):
-    dx = np.diff(x)
-    return np.all(dx <= 0) or np.all(dx >= 0)
-
-def diff_energies(lst_stat, mult_factor, COg, lowE_CO_abs):
-    # take a list of database rows and convert it to differential energies
-    # and coverages
-    cell_lst = [ stat.cell_size for stat in lst_stat ]
-    # get mulp factor based on the cell size
-    mult_lst = []
-    for cell in cell_lst:
-        mult_lst.append(mult_factor[cell])
-
-    sorted_lst = np.array(lst_stat)[np.argsort(mult_lst)]
-    sorted_mult = np.sort(mult_lst)
-
-    # except TypeError:
-        # sorted_lst = lst_stat
-        # sorted_mult = [1, 1, 1, 1]
-
-    natoms_lst = []
-    abs_ener_lst = []
-    cell_sizes_sorted = []
-
-    for i in range(len(sorted_lst)):
-        atoms = sorted_lst[i].toatoms()
-        cell_sizes_sorted.append(sorted_lst[i].cell_size)
-        energies = sorted_lst[i].energy
-        natoms = atoms.repeat([sorted_mult[i], 1, 1])
-        natoms_lst.append(natoms)
-        abs_ener_lst.append(energies)
-
-    # get the number of CO in
-    abs_ener_lst = np.array(abs_ener_lst)
-    nCO_bigcell = []
-    for atom in natoms_lst:
-        nCO = get_number_CO(atom)
-        nCO_bigcell.append(nCO)
-
-    plot_nCO = nCO_bigcell
-    plot_diff_energies = []
-    plot_diff_energies.append(lowE_CO_abs)
-    nCO_bigcell = np.array(nCO_bigcell)
-    # Going from least coverage to most coverage
-    for i in range(len(nCO_bigcell)-1):
-        nCOdiff = np.array(nCO_bigcell[i+1]) - np.array(nCO_bigcell[i])
-        diff_energies = ( sorted_mult[i+1] * abs_ener_lst[i+1] - \
-                sorted_mult[i] * abs_ener_lst[i] - \
-                nCOdiff * COg ) / nCOdiff
-        plot_diff_energies.append(diff_energies)
-    return [cell_sizes_sorted, plot_diff_energies]
-
+# get the atoms object
 def atoms_from_db(db, **kwargs):
     # query the database to give EXACTLY one entry
     # return the atoms object
@@ -130,136 +81,70 @@ def atoms_from_db(db, **kwargs):
         atoms = row.toatoms()
     return atoms
 
-def get_axis_limits(ax, scale=.9):
-    return ax.get_xlim()[1]*scale, ax.get_ylim()[1]*scale
+def main_DFT(thermodb, referdb, list_cells, facet, functional):
+    parse = ParseInfo(thermodb, referdb, list_cells, facet, functional,ref_type='CO')
+    parse.get_pourbaix()
+    return parse.absolute_energy, parse.atoms
+
+
+def get_config_entropy(temperature, theta):
+    temperature = np.array(temperature)
+    theta = np.array(theta)
+    config = 8.617e-5 * temperature * np.log((1-theta)/theta)
+    return config
+
+output = 'output/'
+os.system('mkdir -p ' + output)
 
 if __name__ == '__main__':
 
-    ## CONSTANTS
-    T_switch = 170 #K converting between 111 and 211 step
-    T_max = 270 #K Where the TPD spectra ends
-    T_min = [250, 300] #K Where the rate becomes zero - baseline
-    beta = 3 #k/s Heating rate
-    output = 'output/'
-    os.system('mkdir -p ' + output)
+    """ Constants """
     kB = 8.617e-05 # eV/K
     pco = 101325. #pressure of CO
-    # Vibrational frequency
-    # vibration_energies_ads = 0.00012 * np.array([2072.149, 282.507, 182.434, 173.679, 13.996])
-    vibration_energies_ads = 0.00012 * np.array([1814.001, 367.591, 340.559, 230.796, 167.919, 69.744])
 
-    thermo_ads = HarmonicThermo(vibration_energies_ads)
-    atoms = read('co.traj')
-    vibration_energies_gas = 0.00012 * np.array([2121.52, 39.91, 39.45])
+    """ TPD data """
+    # For 211 TPD
+    T_switch_211 = [110, 165, 175] #K converting between 111 and 211 step
+    T_max_211 = 250 #K Where the TPD spectra ends
+    T_min_211 = [250, 300] #K Where the rate becomes zero - baseline
+    beta_211 = 3 #k/s Heating rate
 
-    thermo_gas = IdealGasThermo(vibration_energies_gas, atoms = atoms, \
-            geometry='linear', symmetrynumber=1, spin=0)
+    # For 310 TPD
+    T_switch_310 = [150] # K converting between 100 and 110
+    T_max_310 = 250 # K Where the TPD spectra ends
+    T_min_310 = [225, 250] #K Where the rate becomes zero - baseline
+    beta_310 = 5 #k/s Heating rate
 
-    coverages_cell = {'1x3': 1, '3CO_4x3':0.75, '2x3':0.5, '2CO_4x3':0.5, '3x3':0.33, '1CO_4x3':0.25, '4CO_4x3':1}
-    #cell_sizes = ['1x3', '1CO_4x3', '2x3',  '3x3','2CO_4x3', '3CO_4x3']
-    # cell_sizes = ['1CO_4x3', '2CO_4x3', '3CO_4x3', '4CO_4x3', ]
-    cell_sizes = ['1CO_4x3', '3x3', '2CO_4x3', '3CO_4x3', '1x3',]
-    min_cov_cell = '1CO_4x3'
-    mult_factor = {'1x3':12, '3CO_4x3':3, '2x3':6, '2CO_4x3':3, '3x3':4, '1CO_4x3':3, '4CO_4x3':3}
-    colors = ['tab:blue', 'tab:orange', 'tab:green', 'tab:red', 'tab:purple', \
-        'tab:brown', 'tab:pink', 'tab:gray', 'tab:olive', 'tab:cyan',\
-        'r', 'b', 'g']
-    accept_states = ['CO_site_8', 'CO_site_13',] # CO states that are actually plotted
-    colors_state = {'CO_site_8':'tab:brown', 'CO_site_13':'tab:olive', \
-                    'CO_site_10':'tab:red', 'CO_site_7':'tab:blue'}
+    """ Frequencies for stable sites """
+    # Here we choose the frequencies corresponding to the lowest energy
+    # site for adsorption of CO from DFT
+    vibration_energies = get_stable_site_vibrations()
 
-    # Stylistic
-    colors_facet = {'211':'tab:red', '111':'tab:green'}
-    ls_facet = {'211':'-', '111':'--'}
+    # Store just the ase vibrations object
+    thermo_ads = {}
+    for facet in vibration_energies:
+        thermo_ads[facet] = HarmonicThermo(vibration_energies[facet])
 
-    ############################################################################
-    # Take the TPD data from experiment
-    input_csv = glob('input_TPD/*.csv')
-    results_211 = AutoVivification()
-    results_111 = AutoVivification()
+    # Gas phase CO energies
+    thermo_gas = get_gas_vibrations()
 
-    for f in input_csv:
-        # For each exposure run the experimental TPD for 211
-        exposure = float(f.split('/')[-1].split('.')[0].split('_')[1].replace('p', '.'))
-        results_211[exposure] = main(f, [T_switch, T_max], T_min, beta)
-        results_111[exposure] = main(f, [0, T_switch], T_min, beta)
-    results = {'211':results_211, '111':results_111}
-    # First figure - normalized TPD and the Gaussian fit
-
-    # Plot the figure which shows the experimental and theoretical TPD curves
-    fig, ax = plt.subplots(2, 2)
-
-    ############################################################################
-    # Figure 1: The gaussian fit of the TPD curve
-    for facet, results_facet in results.items():
-        for index, exposure in enumerate(sorted(results_facet)):
-            if facet == '211':
-                ax[0,0].plot(results_facet[exposure]['temperature'], results_facet[exposure]['norm_rate'],
-                        '.', color=colors[index], alpha=0.40, label=str(exposure) + 'L')
-            else:
-                ax[0,0].plot(results_facet[exposure]['temperature'], results_facet[exposure]['norm_rate'],
-                        '.', color=colors[index], alpha=0.40)
-            # plt.plot(results_facet[exposure]['temperature'], results_facet[exposure]['gaussian_tpd'],
-            #         '-', alpha=0.5, color=colors[index])
-            ax[0,0].plot(results_facet[exposure]['temp_range'], results_facet[exposure]['fit_gauss'],
-                    '-',  color=colors[index])
-
-    ax[0,0].set_ylabel(r'$rate_{norm}$ \ $ML / s$')
-    ax[0,0].set_xlabel(r'Temperature \ K')
-    ax[0,0].annotate('a)', xy=(0., 1.1),xycoords="axes fraction", fontsize=24)
+    """ Specific about coverage """
+    # DFT specifics about coverages
+    cell_sizes, coverages_cell, coverage_labels = get_coverage_details()
 
 
-    ############################################################################
+    # states that need to be plotted for each surface facet
+    accept_states = {}
+    accept_states['211'] = ['CO_site_8']
+    accept_states['100'] = ['CO_site_1']
+    accept_states['110'] = ['CO_site_4']
+    accept_states['111'] = ['CO_site_0']
+    accept_states['recon_110'] = ['CO_site_1']
 
-    # Plot the desorption energy as a function of temperature
-#    fig, ax1 = plt.subplots()
-    ax[0,1].yaxis.set_major_formatter(FormatStrFormatter('%.2f'))
-    ax[0,1].set_xlabel(r'Relative $\theta_{CO}^{vacuum}$ ', fontsize=28)
-    ax[0,1].set_ylabel(r'Exp. $\Delta E_{CO^{*}}^{TS}$ \ eV', fontsize=28)
-
-
-    for index, exposure in enumerate(sorted(results_211)):
-        ax[0,1].plot(results_211[exposure]['theta'],   -1 *results_211[exposure]['Ed'], \
-            '.', alpha=1, color=colors[index], label=str(exposure) + 'L')#, color='tab:blue')
-
-
-
-    ax[0,1].legend(bbox_to_anchor=(1.04,0.5), loc="center left", borderaxespad=0)
-    ax[0,1].annotate('b)', xy=(0., 1.1),xycoords="axes fraction", fontsize=24)
-
-    ############################################################################
-
-    # Plot temperature dependent rate and saturation coverages
-    temp_range = np.linspace(100, 600, 500)
-    ax[1,0].axvline(x=298.15, color='k', ls='--', lw=3, alpha=0.5)
-    for facet, results_facet in results.items():
-        ax[1,0].plot([], [], label='Au('+facet+')',  color='k', lw=3, ls=ls_facet[facet])
-        for ind, exposure in enumerate(results_facet):
-            theta_sat = []
-            for index, T in enumerate(temp_range):
-                entropy_ads = thermo_ads.get_entropy(temperature=T, verbose=False)
-                entropy_gas = thermo_gas.get_entropy(temperature=T, \
-                                                              pressure=pco, verbose=False)
-                entropy_difference =  (entropy_gas - entropy_ads)
-                free_correction = -1 * entropy_difference * T
-                deltaE = results_facet[exposure]['p_Ed'](T)#results_211[exposure]['Ed'][index]
-                deltaG = mp.mpf(deltaE + free_correction)
-                # Get the rate constant based on the mpmath value
-                K = mp.exp( -1 * deltaG / mp.mpf(kB) / mp.mpf(T) )
-                partial_co = pco / 101325
-                theta_eq = mp.mpf(1) / ( mp.mpf(1) + K / mp.mpf(partial_co) )
-                theta_sat.append(theta_eq)
-            ax[1,0].plot(temp_range, theta_sat, color=colors[ind], ls=ls_facet[facet], lw=3)
-    ax[1,0].set_ylabel(r'Relative $\theta_{CO}^{eq}$ ', fontsize=28)
-    ax[1,0].set_xlabel('Temperature \ K', fontsize=28)
-    # ax[1,0].legend(bbox_to_anchor=(1.04,0.5), loc="center left", borderaxespad=0)
-    ax[1,0].legend(loc='best', fontsize=18)
-    ax[1,0].annotate('c)', xy=(0., 1.1),xycoords="axes fraction", fontsize=24)
-
-    ############################################################################
-
-    ## Get DFT Energies for CO on Gold as a function of the coverage
-    # Read in databases
+    """ DFT databases """
+    # which facets to consider
+    facets = ['211', '111-0', '111-1', '100', '110', 'recon_110']
+    # Get reference for CO in vacuum
     referencedb = connect('../databases/references_BEEF_VASP_500.db')
     # Get the gas phase energy of CO
     COgstat = referencedb.get(formula='CO', pw_cutoff=500.0)
@@ -267,79 +152,243 @@ if __name__ == '__main__':
             symmetrynumber=1)['E']
     # Get the energies of all thermodynamics
     thermodb = connect('../databases/Au_CO_coverage.db')
-    # Get all enteries for BEEF
-    # for the following cell sizes
-    # and store it in the following dict
-    dict_stat = AutoVivification()
-    states = get_states(thermodb, 'BF', '1x3')
-    for state in states:
-        for cell in cell_sizes:
-            print(cell, state)
-            stat = thermodb.get(states=state,\
-                    functional='BF', \
-                    cell_size=cell, \
-                    facets='facet_211',
-                    )
-            dict_stat[state][cell] = stat
-
-    # Now parse and plot the minimum energies
-    for state in states:
-        lst_stat_slab = []
-        for cell in cell_sizes:
-            if state == 'state_slab':
-                lst_stat_slab.append(dict_stat[state][cell])
-    all_diff_energies = []
-    for state in states:
-        if state != 'state_slab':
-            lst_stat_CO = []
-            for cell in cell_sizes:
-                lst_stat_CO.append(dict_stat[state][cell])
-
-        lowest_CO = get_lowest_absolute_energies(lst_stat_CO, lst_stat_slab, min_cov_cell, \
-                COg_E)
-
-        cell_sizes_sort, diff_energy  = diff_energies(lst_stat_CO, mult_factor, COg_E, lowest_CO)
-        all_diff_energies.append(np.array(diff_energy))
-        coverages = []
-        for cell in cell_sizes:
-            coverages.append(coverages_cell[cell])
+    functional = 'BF'
 
 
+    """ Stylistic """
+    colors_facet = {'211':'tab:blue', '111-0':'tab:green','111-1':'tab:green', '100':'tab:red',\
+                    '110':'tab:brown', 'recon_110':'tab:cyan', '111':'tab:green'}
+    ls_facet = {'211':'-', '111-0':'--', '111-1':'-.', '110':'-', '100':'--', '111':'--'}
+    colors = ['tab:blue', 'tab:orange', 'tab:green', 'tab:red', 'tab:purple', \
+        'tab:brown', 'tab:pink', 'tab:gray', 'tab:olive', 'tab:cyan',\
+        'r', 'b', 'g'] # List of colours
+    colors_state = {'CO_site_8':'tab:brown', 'CO_site_13':'tab:olive', \
+                    'CO_site_10':'tab:red', 'CO_site_7':'tab:blue'}
 
-        if diff_energy[0] < -0.3:
-            print('Sites which have the CO binding energy in the range of int:')
-            print(state)
-            if state in accept_states:
-                for cell in cell_sizes:
-                    atoms = atoms_from_db(thermodb, **{'states':state, 'cell_size':cell, 'functional':'BF'})
-                    atoms.write(output + state + '_' + cell + '_plotted.traj')
-                # Only taking the negative ones to make the plot look nicer
-                # Other sites are rather positive in energy and
-                # do not matter
-                # add in free energy
-                correction_ads = thermo_ads.get_helmholtz_energy(temperature=300, verbose=False)
-                correction_gas = thermo_gas.get_gibbs_energy(temperature=300, pressure=pco, verbose=False)
-                correction = correction_ads - correction_gas
-                ax[1,1].plot(coverages, diff_energy + correction, 'o-',
-                     color=colors_state[state])
 
-    ax[1,1].set_xlabel(r'$\theta_{CO^{*}}$ \ ML', fontsize=28)
-    ax[1,1].set_ylabel(r'$\Delta G_{CO^{*}}$ \ eV', fontsize=28)
+    fig, ax = plt.subplots(4, 2, figsize=(19, 20),dpi=600)
+    figc, axc = plt.subplots(5, 1,figsize=(6,12))
+    inferno = cm.get_cmap('inferno', 12)
+    viridis = cm.get_cmap('viridis', 5)
+    ############################################################################
+    # Take the TPD data from experiment
+    input_csv_211 = glob('input_TPD/Au_211/*.csv')
+    input_csv_310 = glob('input_TPD/Au_310/*.csv')
+
+    results = AutoVivification()
+    # results_211 = AutoVivification()
+    # results_111 = AutoVivification()
+
+    for f in input_csv_211:
+        # For each exposure run the experimental TPD for 211
+        exposure = float(f.split('/')[-1].split('.')[0].split('_')[1].replace('p', '.'))
+        results['211'][exposure] = main(f, [T_switch_211[1], T_max_211], T_min_211, beta_211)
+        # results['intermediate'][exposure] = main(f, [T_switch_211[1], T_switch_211[2]], T_min_211, beta_211)
+        results['111-0'][exposure] = main(f, [0, T_switch_211[0]], T_min_211, beta_211)
+        results['111-1'][exposure] = main(f, [T_switch_211[0], T_switch_211[1]], T_min_211, beta_211)
+
+    for f in input_csv_310:
+        # For each exposure run the experimental TPD for 310
+        exposure = round(float(f.split('/')[-1].split('.')[0].split('_')[1].replace('p', '.')) * 12,2)
+        results['110'][exposure] = main(f, [T_switch_310, T_max_310], T_min_310, beta_310)
+        results['100'][exposure] = main(f, [0, T_switch_310], T_min_310, beta_310)
+
+    # First figure - normalized TPD and the Gaussian fit
+    # Plot the figure which shows the experimental and theoretical TPD curves
+
+    ############################################################################
+    # Figure 1: The gaussian fit of the TPD curve
+    for facet, results_facet in results.items():
+        for index, exposure in enumerate(sorted(results_facet)):
+            if facet in ['211', '111-0', '111-1']:
+                ax[0,0].plot(results_facet[exposure]['temperature'], results_facet[exposure]['norm_rate'],
+                        '.', color=inferno(index), alpha=0.40)
+            # plt.plot(results_facet[exposure]['temperature'], results_facet[exposure]['gaussian_tpd'],
+            #         '-', alpha=0.5, color=colors[index])
+                ax[0,0].plot(results_facet[exposure]['temp_range'], results_facet[exposure]['fit_gauss'],
+                        '-',  color=inferno(index))
+                ax[0,0].annotate('Au(111)', xy=(125, 30), xycoords='data',xytext=(225,30), \
+                            arrowprops=dict(facecolor='black', shrink=0.05, color=colors_facet['111-0']),
+                            horizontalalignment='right', verticalalignment='center', color=colors_facet['111-0'], fontsize=22)
+                ax[0,0].annotate('Au(211)', xy=(190, 12), xycoords='data',xytext=(190,20), \
+                            arrowprops=dict(facecolor='black', shrink=0.05, color=colors_facet['211']),
+                            horizontalalignment='center', verticalalignment='center', color=colors_facet['211'], fontsize=22)
+            elif facet in ['100', '110']:
+                ax[0,1].plot(results_facet[exposure]['temperature'], results_facet[exposure]['norm_rate'],
+                        '.', color=viridis(index), alpha=0.40)
+            # plt.plot(results_facet[exposure]['temperature'], results_facet[exposure]['gaussian_tpd'],
+            #         '-', alpha=0.5, color=colors[index])
+                ax[0,1].plot(results_facet[exposure]['temp_range'], results_facet[exposure]['fit_gauss'],
+                        '-',  color=viridis(index))
+                ax[0,1].annotate('Au(100)', xy=(125, 55), xycoords='data',xytext=(200,55), \
+                            arrowprops=dict(facecolor='black', shrink=0.05, color=colors_facet['100']),
+                            horizontalalignment='right', verticalalignment='center', color=colors_facet['100'], fontsize=22)
+                ax[0,1].annotate('Au(110)', xy=(190, 20), xycoords='data',xytext=(250,20), \
+                            arrowprops=dict(facecolor='black', shrink=0.05, color=colors_facet['110']),
+                            horizontalalignment='right', verticalalignment='center', color=colors_facet['110'], fontsize=22)
+
+    ax[0,0].set_ylabel(r'$rate_{norm}$ \ $ML / s$')
+    ax[0,0].set_xlabel(r'Temperature \ K')
+    ax[0,0].annotate('a)', xy=(0., 1.1),xycoords="axes fraction", fontsize=24)
+    ax[0,1].set_ylabel(r'$rate_{norm}$ \ $ML / s$')
+    ax[0,1].set_xlabel(r'Temperature \ K')
+    ax[0,1].annotate('b)', xy=(0., 1.1),xycoords="axes fraction", fontsize=24)
+
+    ############################################################################
+    # Plot the desorption energy as a function of temperature
+#    fig, ax1 = plt.subplots()
+    ax[1,0].yaxis.set_major_formatter(FormatStrFormatter('%.2f'))
+    ax[1,0].set_xlabel(r'$\theta_{CO}^{rel}$ ', fontsize=28)
+    ax[1,0].set_ylabel(r'$ E_{d}$ \ eV', fontsize=28)
+    ax[1,1].yaxis.set_major_formatter(FormatStrFormatter('%.2f'))
+    ax[1,1].set_xlabel(r'$\theta_{CO}^{rel}$ ', fontsize=28)
+    ax[1,1].set_ylabel(r'$ E_{d}$ \ eV', fontsize=28)
+
+    for index, exposure in enumerate(sorted(results['211'])):
+        config = get_config_entropy(results['211'][exposure]['temperature'][0:-1], \
+                                    results['211'][exposure]['theta'])
+        # print(config)
+        ax[1,0].plot(results['211'][exposure]['theta'], results['211'][exposure]['Ed'] , \
+            '.', alpha=1, color=inferno(index), label=str(exposure) + 'L')#, color='tab:blue')
+
+    ax[1,0].legend(bbox_to_anchor=(1.04,0.5), loc="center left", borderaxespad=0)
+    ax[1,0].annotate('c)', xy=(0., 1.1),xycoords="axes fraction", fontsize=24)
+    ax[1,0].annotate('Au(211)', xy=(0.5, 0.6), color=colors_facet['211'], fontsize=24, weight='bold')
+
+    for index, exposure in enumerate(sorted(results['110'])):
+        ax[1,1].plot(results['110'][exposure]['theta'],  results['110'][exposure]['Ed'], \
+            '.', alpha=1, color=viridis(index), label=str(exposure) + 'L')#, color='tab:blue')
+    ax[1,1].annotate('Au(110)', xy=(0.5, 0.55), color=colors_facet['110'], fontsize=24, weight='bold')
+
+    ax[1,1].legend(bbox_to_anchor=(1.04,0.5), loc="center left", borderaxespad=0)
     ax[1,1].annotate('d)', xy=(0., 1.1),xycoords="axes fraction", fontsize=24)
 
+    ############################################################################
+    # Plot the temperature dependent energy
+    temp_range = np.linspace(100, 600, 500)
+    count = 0
+    for facet, results_facet in results.items():
+        # if facet in ['111', '211']:
+        #     axc[2,0].plot([], [], label='Au('+facet+')',  color='k', lw=3, ls=ls_facet[facet])
+        # elif facet in ['100', '110']:
+        #     axc[2,1].plot([], [], label='Au('+facet+')',  color='k', lw=3, ls=ls_facet[facet])
 
-    # plt.figure(3)
-    # for exposure in results_111:
-    #     plt.plot(results_111[exposure]['theta'], results_111[exposure]['Ed'])
-    # plt.ylabel(r'$\Delta E_{d}$ / eV')
-    # plt.xlabel(r'$\theta$ / ML')
-    # plt.savefig(output + 'desorption_theta_111.pdf')
-    # plt.close()
+        for ind, exposure in enumerate(results_facet):
+            theta_sat = []
+            temperature_Exp = results_facet[exposure]['temperature'][0:-1]
+            # for index, T in enumerate(temp_range):
+            #     entropy_ads = thermo_ads[facet].get_entropy(temperature=T, verbose=False)
+            #     entropy_gas = thermo_gas.get_entropy(temperature=T, \
+            #                                                   pressure=pco, verbose=False)
+            #     entropy_difference =  (entropy_gas - entropy_ads)
+            #     free_correction = -1 * entropy_difference * T
+            deltaE = results_facet[exposure]['p_Ed'](temp_range)#results_211[exposure]['Ed'][index]
+            axc[count].plot(temp_range, deltaE, color=inferno(ind), ls=ls_facet[facet], lw=3)
+            axc[count].plot(temperature_Exp, results_facet[exposure]['Ed'], '.', \
+                            mew=3, fillstyle='none',color=inferno(ind))
+            axc[count].set_xlabel(r'Temperature \ K')
+            axc[count].set_ylabel(r'$\Delta E_{CO}$')
+            axc[count].set_title(facet)
+        count += 1
+    figc.tight_layout()
+    figc.savefig(output + 'desorption_energy_temp.pdf')
+
+    # Plot temperature dependent rate and saturation coverages
+    ax[2,0].axvline(x=298.15, color='k', ls='--', lw=3, alpha=0.5)
+    ax[2,1].axvline(x=298.15, color='k', ls='--', lw=3, alpha=0.5)
+    for facet, results_facet in results.items():
+        if facet in ['111-0', '111-1', '211']:
+            ax[2,0].plot([], [], label='Au('+facet+')',  color='k', lw=3, ls=ls_facet[facet])
+        elif facet in ['100', '110']:
+            ax[2,1].plot([], [], label='Au('+facet+')',  color='k', lw=3, ls=ls_facet[facet])
+
+        for ind, exposure in enumerate(results_facet):
+            theta_sat = []
+            for index, T in enumerate(temp_range):
+                entropy_ads = thermo_ads[facet.split('-')[0]].get_entropy(temperature=T, verbose=False)
+                entropy_gas = thermo_gas.get_entropy(temperature=T, \
+                                                              pressure=pco, verbose=False)
+                entropy_difference =  (entropy_gas - entropy_ads)
+                free_correction = -1 * entropy_difference * T #
+                if T < max(results_facet[exposure]['temperature']):
+                    deltaE = results_facet[exposure]['p_Ed'](T)#results_211[exposure]['Ed'][index]
+                else:
+                    deltaE = results_facet[exposure]['p_Ed'](max(results_facet[exposure]['temperature']))
+                deltaG = mp.mpf(deltaE + free_correction)
+                K = mp.exp( -1 * deltaG / mp.mpf(kB) / mp.mpf(T) )
+                partial_co = pco / 101325
+                theta_eq = mp.mpf(1) / ( mp.mpf(1) + K / mp.mpf(partial_co) )
+                theta_sat.append(theta_eq)
+            if facet in ['111-0', '111-1', '211']:
+                ax[2,0].plot(temp_range, theta_sat, color=inferno(ind), ls=ls_facet[facet], lw=3)
+            elif facet in ['100', '110']:
+                ax[2,1].plot(temp_range, theta_sat, color=viridis(ind), ls=ls_facet[facet], lw=3)
+    ax[2,0].set_ylabel(r'Equilibirum $\theta_{CO}^{rel}$ ', fontsize=28)
+    ax[2,0].set_xlabel('Temperature \ K', fontsize=28)
+    # ax[1,0].legend(bbox_to_anchor=(1.04,0.5), loc="center left", borderaxespad=0)
+    ax[2,0].legend(bbox_to_anchor=(1.04,0.5), loc="center left", borderaxespad=0)
+    ax[2,0].annotate('e)', xy=(0., 1.1),xycoords="axes fraction", fontsize=24)
+    ax[2,1].set_ylabel(r'Equilibirum $\theta_{CO}^{rel}$ ', fontsize=28)
+    ax[2,1].set_xlabel('Temperature \ K', fontsize=28)
+    # ax[1,0].legend(bbox_to_anchor=(1.04,0.5), loc="center left", borderaxespad=0)
+    ax[2,1].legend(bbox_to_anchor=(1.04,0.5), loc="center left", borderaxespad=0)
+    ax[2,1].annotate('f)', xy=(0., 1.1),xycoords="axes fraction", fontsize=24)
+
+    ############################################################################
+    # Plot differential energies with DFT
+    absE_DFT = AutoVivification()
+    atoms_DFT = AutoVivification()
+    relE_DFT = AutoVivification()
+    i = 0
+    for facet in facets:
+        if '-' in facet:
+            facet = facet.split('-')[0]
+            i+= 1
+        absE_DFT[facet], atoms_DFT[facet] = main_DFT(thermodb, referencedb, cell_sizes[facet], facet, functional)
+        avg_energy = get_differential_energy(absE_DFT[facet], atoms_DFT[facet], facet, COg_E)
+        # pprint(avg_energy)
+
+        # Useful for checking stable sites comment out when needed
+        # selected_states = [] # states which contain the lowest energy state
+        # i=0
+        # while i < len(avg_energy['CO_site_0'])-1:
+        #     lowest_energy = 6.
+        #     for state in avg_energy:
+        #         if avg_energy[state][i] < lowest_energy:
+        #             lowest_energy = avg_energy[state][i]
+        #             state_current_lowest = state
+        #     selected_states.append(state_current_lowest)
+        #     i+=1
+        # print(selected_states)
+
+        cells = cell_sizes[facet]
+        coverages = list(reversed([coverages_cell[facet][cell] for cell in cells]))
+        for state in avg_energy:
+            if state in accept_states[facet]:
+                if facet in ['111']:
+                    ax[3,0].plot(coverages, avg_energy[state] , 'o-', color=colors_facet[facet], label='Au('+facet+')' if i == 1 else '')
+                elif facet in '211':
+                    ax[3,0].plot(coverages, avg_energy[state] , 'o-', label='Au('+facet+')', color=colors_facet[facet])
+                elif facet in ['110', 'recon_110', '100']:
+                    ax[3,1].plot(coverages, avg_energy[state] , 'o-', \
+                        label='Au('+facet.replace('_', '-')+')', \
+                        color=colors_facet[facet])
+
+    #
+    ax[3,0].set_xlabel(r'$\theta_{CO}^{DFT}$ \ ML', fontsize=28)
+    ax[3,0].set_ylabel(r'$\Delta E_{CO}^{avg}$ \ eV', fontsize=28)
+    ax[3,0].annotate('g)', xy=(0., 1.1),xycoords="axes fraction", fontsize=24)
+    ax[3,0].legend(loc='best',fontsize=18)
+    ax[3,1].set_xlabel(r'$\theta_{CO}^{DFT}$ \ ML', fontsize=28)
+    ax[3,1].set_ylabel(r'$\Delta E_{CO}^{avg}$ \ eV', fontsize=28)
+    ax[3,1].annotate('h)', xy=(0., 1.1),xycoords="axes fraction", fontsize=24)
+    ax[3,1].legend(loc='best',fontsize=18)
+
 
     ############################################################################
 
+    fig.tight_layout()
+    fig.savefig(output + 'TPD_compare.svg')
+    fig.savefig(output + 'TPD_compare.pdf')
 
-
-    plt.tight_layout()
-    plt.savefig(output + 'TPD_compare.svg')
-    plt.show()
+    # plt.show()

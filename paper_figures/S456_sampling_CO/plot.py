@@ -121,7 +121,7 @@ if __name__ == '__main__':
 
     ## Get DFT Energies for CO on Gold as a function of the coverage
     # Read in databases
-    referencedb = connect('input_DFT/references_BEEF_VASP_500.db')
+    referencedb = connect('../databases/references_BEEF_VASP_500.db')
     # Get the gas phase energy of CO
     COgstat = referencedb.get(formula='CO', pw_cutoff=500.0)
     COg_E =  get_vibrational_energy(COgstat, [], method='novib', geometry='linear', \

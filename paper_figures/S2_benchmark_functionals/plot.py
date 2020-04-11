@@ -157,13 +157,13 @@ if __name__ == '__main__':
 
     ## Get DFT Energies for CO on Gold as a function of the coverage
     # Read in databases
-    referencedb = connect('input_DFT/references_BEEF_VASP_500.db')
+    referencedb = connect('../databases/references_BEEF_VASP_500.db')
     # Get the gas phase energy of CO
     COgstat = referencedb.get(formula='CO', pw_cutoff=500.0)
     COg_E =  get_vibrational_energy(COgstat, [], method='novib', geometry='linear', \
             symmetrynumber=1)['E']
     # Get the energies of all thermodynamics
-    thermodb = connect('input_DFT/Au_CO_coverage.db')
+    thermodb = connect('../databases/Au_CO_coverage.db')
     # Get all enteries for BEEF
     # for the following cell sizes
     # and store it in the following dict
@@ -184,9 +184,9 @@ if __name__ == '__main__':
     for index, cell in enumerate(cell_sizes):
         energies_all = []
         for state in states:
-            if state != 'slab':
+            if state != 'state_slab':
                 ads_energy = dict_stat[cell][state].energy \
-                          -  dict_stat[cell]['slab'].energy \
+                          -  dict_stat[cell]['state_slab'].energy \
                           - COg_E
 
                 energies_all.append(ads_energy)

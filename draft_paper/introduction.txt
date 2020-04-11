@@ -1,0 +1,12 @@
+Introduction 
+
+Main points: 
+
+1. Au is one of the best catalysts known for production of CO from CO2. Yet the facet dependency on activity is not fully understood. 
+
+2. CO is a critical reaction intermediate in electrochemical CO2 reduction - binding character should be understood completely in order to tune reactivity. 
+
+3. Fundamental question on whether CO adsorbs on Au in vacuum, atmospheric conditions and in an electrochemical environment. Conventional prediction is that Au adsorbs on a step site such as a 211. 
+
+4. This work presents a joint experimental and theoretical investigation on the binding characteristics of CO on Au. We first benchmark DFT adsorption energies to available experimental TPD data. Simulating TPD spectra shows that upto 0.5ML of CO may be present on an Au(211) step. By carrying out lead under-potential deposition, active CO adsorption sites are blocked. This is rationalized by surface pourbaix diagrams which show that lead blocks reactive Au(211) and Au(100) facets, while the 111 facet is covered only at more reducing conditions. Ab-initio molecular dynamics calculations show the impact of competitive water adsorption on the step sites is more prominent than compared to terrace sites. This investigation using state of the art methods allows a fundamental understanding of the interface at CO2R condition on Polycrystalline gold. 
+
