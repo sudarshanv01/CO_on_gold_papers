@@ -62,7 +62,8 @@ def main(tpd_filename, temprange, tempmin, beta):
             'theta':expTPD.theta,
             'p_Ed':p_Ed,
             'fit_gauss':fit_gauss,
-            'temp_range':temp_range}
+            'temp_range':temp_range,
+            'popt':expTPD.popt}
 
 # get the states for a chosen config
 def get_states(stat, functional, cell, facet):
@@ -86,6 +87,30 @@ def main_DFT(thermodb, referdb, list_cells, facet, functional):
     parse.get_pourbaix()
     return parse.absolute_energy, parse.atoms
 
+def fit_config_entropy(temperature, a, theta, popt, popt_max):
+    # relative coverage will just be the integration
+    # print(temperature)
+    total_temperature_range = np.linspace(175, 300, 500)
+    temp_range = temperature
+
+    # rates = gaussian(temp_range, *popt)
+    # rates_all = gaussian(total_temperature_range, *popt)
+    # rates_max = gaussian(total_temperature_range, *popt_max)
+    #
+    # # integrate the rate to get the relative coverage
+    # # print(rates, temp_range)
+    # theta_all = np.trapz(rates_max, total_temperature_range)
+    # theta_rel = []
+    # for i in range(len(temp_range)):
+    #     temp_i = min(range(len(total_temperature_range)), key=lambda j: abs(total_temperature_range[j]-temp_range[i]))
+    #     # print(temp_range[i], total_temperature_range[temp_i])
+    #     theta_val = np.trapz(rates_all[temp_i:], total_temperature_range[temp_i:])
+    #     theta_rel.append(theta_val / theta_all)
+    # theta_rel = np.array(theta_rel)
+    theta_rel = 0.33
+    Ed = a -  8.617e-5 * temperature * np.log(theta*theta_rel / ( 1 - theta*theta_rel))
+    # print(Ed, a, theta)
+    return Ed
 
 def get_config_entropy(temperature, theta):
     temperature = np.array(temperature)
@@ -143,7 +168,7 @@ if __name__ == '__main__':
 
     """ DFT databases """
     # which facets to consider
-    facets = ['211', '111-0', '111-1', '100', '110', 'recon_110']
+    facets = ['211', '111-0', '111-1', '100', '110',]
     # Get reference for CO in vacuum
     referencedb = connect('../databases/references_BEEF_VASP_500.db')
     # Get the gas phase energy of CO
@@ -166,8 +191,9 @@ if __name__ == '__main__':
                     'CO_site_10':'tab:red', 'CO_site_7':'tab:blue'}
 
 
-    fig, ax = plt.subplots(4, 2, figsize=(19, 20),dpi=600)
-    figc, axc = plt.subplots(5, 1,figsize=(6,12))
+    fig, ax = plt.subplots(5, 2, figsize=(20, 26),dpi=600) # figure for the paper
+    figc, axc = plt.subplots(5, 1,figsize=(6,12)) # Energy as a function of temp
+    figs, axs = plt.subplots(1, 1,figsize=(8,6)) # saturation coverage figure
     inferno = cm.get_cmap('inferno', 12)
     viridis = cm.get_cmap('viridis', 5)
     ############################################################################
@@ -227,12 +253,12 @@ if __name__ == '__main__':
                             arrowprops=dict(facecolor='black', shrink=0.05, color=colors_facet['110']),
                             horizontalalignment='right', verticalalignment='center', color=colors_facet['110'], fontsize=22)
 
-    ax[0,0].set_ylabel(r'$rate_{norm}$ \ $ML / s$')
+    ax[0,0].set_ylabel(r'$rate$ \ arb. unit')
     ax[0,0].set_xlabel(r'Temperature \ K')
-    ax[0,0].annotate('a)', xy=(0., 1.1),xycoords="axes fraction", fontsize=24)
-    ax[0,1].set_ylabel(r'$rate_{norm}$ \ $ML / s$')
+    ax[0,0].annotate('a)', xy=(-0.2, 1.1),xycoords="axes fraction", fontsize=26)
+    ax[0,1].set_ylabel(r'$rate$ \ arb. unit')
     ax[0,1].set_xlabel(r'Temperature \ K')
-    ax[0,1].annotate('b)', xy=(0., 1.1),xycoords="axes fraction", fontsize=24)
+    ax[0,1].annotate('b)', xy=(-0.2, 1.1),xycoords="axes fraction", fontsize=26)
 
     ############################################################################
     # Plot the desorption energy as a function of temperature
@@ -252,7 +278,7 @@ if __name__ == '__main__':
             '.', alpha=1, color=inferno(index), label=str(exposure) + 'L')#, color='tab:blue')
 
     ax[1,0].legend(bbox_to_anchor=(1.04,0.5), loc="center left", borderaxespad=0)
-    ax[1,0].annotate('c)', xy=(0., 1.1),xycoords="axes fraction", fontsize=24)
+    ax[1,0].annotate('c)', xy=(-0.2, 1.1),xycoords="axes fraction", fontsize=26)
     ax[1,0].annotate('Au(211)', xy=(0.5, 0.6), color=colors_facet['211'], fontsize=24, weight='bold')
 
     for index, exposure in enumerate(sorted(results['110'])):
@@ -261,7 +287,113 @@ if __name__ == '__main__':
     ax[1,1].annotate('Au(110)', xy=(0.5, 0.55), color=colors_facet['110'], fontsize=24, weight='bold')
 
     ax[1,1].legend(bbox_to_anchor=(1.04,0.5), loc="center left", borderaxespad=0)
-    ax[1,1].annotate('d)', xy=(0., 1.1),xycoords="axes fraction", fontsize=24)
+    ax[1,1].annotate('d)', xy=(-0.2, 1.1),xycoords="axes fraction", fontsize=26)
+
+    # Fit the lower coverage region of the desorption energy to get the
+    ax2 = ax[3,0].twinx()
+    fit_theta_lim = [0.5, 1] # the choice of where the fit end
+    for index, exposure in enumerate(sorted(results['211'])):
+            # ax[3,0].plot([], [], 'o',fillstyle='none', mew=3, color='k', label=r'up to $\theta_{CO}^{rel} = $  1')
+
+        for fit_theta in fit_theta_lim:
+            if index == 0 and fit_theta == 1.:
+                ax[3,0].plot([], [], 'o',  color='k', fillstyle='none', mew=3,\
+                label=r'up to $\theta_{CO}^{rel} = $  '+str(fit_theta))
+            elif index == 0 and fit_theta < 1:
+                ax[3,0].plot([], [], 'o',  color='k', label=r'up to $\theta_{CO}^{rel} = $  '+str(fit_theta))
+            # config = get_config_entropy(results['211'][exposure]['temperature'][0:-1], \
+            #                             results['211'][exposure]['theta'])
+            fit_Ed = [results['211'][exposure]['Ed'][i] \
+                            for i in range(len(results['211'][exposure]['Ed'])) if \
+                             0.01 < results['211'][exposure]['theta'][i] < fit_theta ]
+            fit_T = [results['211'][exposure]['temperature'][i] \
+                            for i in range(len(results['211'][exposure]['Ed'])) if \
+                            0.01 < results['211'][exposure]['theta'][i] < fit_theta ]
+            # Find the coverage through a fit
+            rates_popt = results['211'][exposure]['popt']
+            rates_popt_max = results['211'][50.0]['popt']
+            popt, pcov = curve_fit(\
+                                    lambda temp, a, theta: fit_config_entropy(temp, a, theta, rates_popt, rates_popt), \
+                                    fit_T, fit_Ed, [0.2, 0.0001])
+            print(np.sqrt(np.diag(pcov)))
+            if fit_theta != 1.:
+                # axs.plot(results['211'][exposure]['temperature'][0:-1], results['211'][exposure]['Ed'], 'o', color='tab:red')
+
+                # axs.plot(results['211'][exposure]['temperature'][0:-1], results['211'][exposure]['Ed'], 'o', color=inferno(index), label=exposure)
+                # axs.plot(results['211'][exposure]['temperature'][0:-1],\
+                # fit_config_entropy(np.array(results['211'][exposure]['temperature'][0:-1]),\
+                 # *popt, rates_popt, rates_popt), '-', color=inferno(index))
+                axs.plot(fit_T, fit_Ed, 'o', color=inferno(index), label=exposure)
+                axs.plot(fit_T,\
+                fit_config_entropy(np.array(fit_T) , *popt, rates_popt, rates_popt), '-', color=inferno(index))
+                axs.set_ylabel(r'$E_{d}$ \ eV')
+                axs.set_xlabel(r'$Temperature $ \ K')
+                axs.legend(bbox_to_anchor=(1.04,0.5), loc="center left", borderaxespad=0)
+            e0, theta_sat = popt
+            if fit_theta == 1.:
+                ax[3,0].plot(float(exposure), theta_sat, 'o', fillstyle='none', mew=3, color='tab:blue')
+                ax2.plot(float(exposure), e0, 'o', fillstyle='none', mew=3,color='tab:red')
+            else:
+                ax[3,0].plot(float(exposure), theta_sat, 'o',  mew=3, color='tab:blue')
+                ax2.plot(float(exposure), e0, 'o',  mew=3,color='tab:red')
+
+    ax[3,0].set_ylabel(r'$\theta_{sat}$ \ ML', color='tab:blue', fontsize=28)
+    ax[3,0].tick_params(axis='y', labelcolor='tab:blue')
+    ax2.set_ylabel(r'$\Delta E_{0}$ \ eV', color='tab:red', fontsize=28)  # we already handled the x-label with ax1
+    ax2.yaxis.set_major_formatter(FormatStrFormatter('%0.2f'))
+    # ax2.set_ylim([0.55, 0.65])
+    ax[3,0].legend(bbox_to_anchor=(0,1.02,1,0.2), loc="lower left",
+                mode="expand", borderaxespad=0, ncol=1)
+    ax2.tick_params(axis='y', labelcolor='tab:red')
+    ax[3,0].annotate('g)', xy=(-0.2, 1.1),xycoords="axes fraction", fontsize=26)
+    ax[3,0].set_xlabel(r'Initial exposure \ L', fontsize=28)
+
+    ax3 = ax[3,1].twinx()
+    for index, exposure in enumerate(sorted(results['110'])):
+        # if index == 0:
+        #     ax[3,1].plot([], [], 'o',fillstyle='none', mew=3, color='k', label=r'up to $\theta_{CO}^{rel} = $  1')
+        #     ax[3,1].plot([], [], 'o', color='k', label=r'up to $\theta_{CO}^{rel} = $ 0.3')
+
+        for fit_theta in fit_theta_lim:
+            if index == 0 and fit_theta == 1.:
+                ax[3,1].plot([], [], 'o',  color='k', fillstyle='none', mew=3,\
+                label=r'up to $\theta_{CO}^{rel} = $  '+str(fit_theta))
+            elif index == 0 and fit_theta < 1:
+                ax[3,1].plot([], [], 'o',  color='k', label=r'up to $\theta_{CO}^{rel} = $  '+str(fit_theta))
+            fit_Ed = [results['110'][exposure]['Ed'][i] \
+                            for i in range(len(results['110'][exposure]['Ed'])) if \
+                             0.01 < results['110'][exposure]['theta'][i] < fit_theta ]
+            fit_T = [results['110'][exposure]['temperature'][i] \
+                            for i in range(len(results['110'][exposure]['Ed'])) if \
+                            0.01 < results['110'][exposure]['theta'][i] < fit_theta ]
+            # Find the coverage through a fit
+            rates_popt = results['110'][exposure]['popt']
+            # rates_popt_max = results['110'][1.0]['popt']
+            popt, pcov = curve_fit(\
+                                    lambda temp, a, theta: fit_config_entropy(temp, a, theta, rates_popt, rates_popt), \
+                                    fit_T, fit_Ed, [0.2, 0.0001])
+            # print("FIT")
+            # print(fit_config_entropy(np.array(fit_T), *popt, rates_popt))
+            # print(popt)
+            e0, theta_sat = popt
+            if fit_theta == 1.:
+                # print(exposure, theta_sat)
+                ax[3,1].plot(float(exposure), theta_sat, 'o', fillstyle='none', mew=3, color='tab:blue')
+                ax3.plot(float(exposure), e0, 'o', fillstyle='none', mew=3,color='tab:red')
+            else:
+                ax[3,1].plot(float(exposure), theta_sat, 'o',  mew=3, color='tab:blue')
+                ax3.plot(float(exposure), e0, 'o',  mew=3,color='tab:red')
+
+    ax[3,1].set_ylabel(r'$\theta_{sat}$ \ ML', color='tab:blue', fontsize=28)
+    ax[3,1].tick_params(axis='y', labelcolor='tab:blue')
+    ax3.set_ylabel(r'$\Delta E_{0}$ \ eV', color='tab:red', fontsize=28)  # we already handled the x-label with ax1
+    ax2.yaxis.set_major_formatter(FormatStrFormatter('%0.2f'))
+    ax3.set_ylim([0.45, 0.60])
+    ax[3,1].legend(bbox_to_anchor=(0,1.02,1,0.2), loc="lower left",
+                mode="expand", borderaxespad=0, ncol=1)
+    ax3.tick_params(axis='y', labelcolor='tab:red')
+    ax[3,1].annotate('h)', xy=(-0.2, 1.1),xycoords="axes fraction", fontsize=26)
+    ax[3,1].set_xlabel(r'Initial exposure \ L', fontsize=28)
 
     ############################################################################
     # Plot the temperature dependent energy
@@ -327,12 +459,12 @@ if __name__ == '__main__':
     ax[2,0].set_xlabel('Temperature \ K', fontsize=28)
     # ax[1,0].legend(bbox_to_anchor=(1.04,0.5), loc="center left", borderaxespad=0)
     ax[2,0].legend(bbox_to_anchor=(1.04,0.5), loc="center left", borderaxespad=0)
-    ax[2,0].annotate('e)', xy=(0., 1.1),xycoords="axes fraction", fontsize=24)
+    ax[2,0].annotate('e)', xy=(-0.2, 1.1),xycoords="axes fraction", fontsize=26)
     ax[2,1].set_ylabel(r'Equilibirum $\theta_{CO}^{rel}$ ', fontsize=28)
     ax[2,1].set_xlabel('Temperature \ K', fontsize=28)
     # ax[1,0].legend(bbox_to_anchor=(1.04,0.5), loc="center left", borderaxespad=0)
     ax[2,1].legend(bbox_to_anchor=(1.04,0.5), loc="center left", borderaxespad=0)
-    ax[2,1].annotate('f)', xy=(0., 1.1),xycoords="axes fraction", fontsize=24)
+    ax[2,1].annotate('f)', xy=(-0.2, 1.1),xycoords="axes fraction", fontsize=26)
 
     ############################################################################
     # Plot differential energies with DFT
@@ -364,31 +496,49 @@ if __name__ == '__main__':
         cells = cell_sizes[facet]
         coverages = list(reversed([coverages_cell[facet][cell] for cell in cells]))
         for state in avg_energy:
+            entropy_ads = thermo_ads[facet].get_helmholtz_energy(temperature=298, verbose=False)
+            entropy_gas = thermo_gas.get_gibbs_energy(temperature=298, \
+                                                          pressure=101325, verbose=False)
+            config = get_config_entropy(298, coverages)
+            delta_zpe = thermo_ads[facet].get_ZPE_correction() - thermo_gas.get_ZPE_correction()
+            # replace the last coverage entry with 0
+            config[-1] = 0
+            free_diff = entropy_ads - entropy_gas - config
+            # free_correction = -1 * entropy_difference * T
             if state in accept_states[facet]:
                 if facet in ['111']:
-                    ax[3,0].plot(coverages, avg_energy[state] , 'o-', color=colors_facet[facet], label='Au('+facet+')' if i == 1 else '')
+                    ax[4,0].plot(coverages, avg_energy[state] + free_diff , 'o-', color=colors_facet[facet], label='Au('+facet+')' if i == 1 else '')
+                    ax[4,0].errorbar(coverages, avg_energy[state] + free_diff, 0.1*np.ones(len(coverages)),  color=colors_facet[facet])
                 elif facet in '211':
-                    ax[3,0].plot(coverages, avg_energy[state] , 'o-', label='Au('+facet+')', color=colors_facet[facet])
+                    delta_E_zpe = avg_energy[state] + delta_zpe
+                    print(delta_zpe)
+                    print(r'$\Delta E_{0} from DFT for $ 211 is %1.3f'%delta_E_zpe[0])
+                    ax[4,0].plot(coverages, avg_energy[state] + free_diff, 'o-', label='Au('+facet+')', color=colors_facet[facet])
+                    ax[4,0].errorbar(coverages, avg_energy[state] + free_diff, 0.1*np.ones(len(coverages)), color=colors_facet[facet])
                 elif facet in ['110', 'recon_110', '100']:
-                    ax[3,1].plot(coverages, avg_energy[state] , 'o-', \
+                    ax[4,1].plot(coverages, avg_energy[state] + free_diff, 'o-', \
                         label='Au('+facet.replace('_', '-')+')', \
                         color=colors_facet[facet])
+                    ax[4,1].errorbar(coverages, avg_energy[state] + free_diff, 0.1*np.ones(len(coverages)),  color=colors_facet[facet])
+
 
     #
-    ax[3,0].set_xlabel(r'$\theta_{CO}^{DFT}$ \ ML', fontsize=28)
-    ax[3,0].set_ylabel(r'$\Delta E_{CO}^{avg}$ \ eV', fontsize=28)
-    ax[3,0].annotate('g)', xy=(0., 1.1),xycoords="axes fraction", fontsize=24)
-    ax[3,0].legend(loc='best',fontsize=18)
-    ax[3,1].set_xlabel(r'$\theta_{CO}^{DFT}$ \ ML', fontsize=28)
-    ax[3,1].set_ylabel(r'$\Delta E_{CO}^{avg}$ \ eV', fontsize=28)
-    ax[3,1].annotate('h)', xy=(0., 1.1),xycoords="axes fraction", fontsize=24)
-    ax[3,1].legend(loc='best',fontsize=18)
+    ax[4,0].set_xlabel(r'$\theta_{CO}^{DFT}$ \ ML', fontsize=28)
+    ax[4,0].set_ylabel(r'$\Delta G_{CO}^{diff}$ \ eV', fontsize=28)
+    ax[4,0].annotate('i)', xy=(-0.2, 1.1),xycoords="axes fraction", fontsize=26)
+    ax[4,0].legend(loc='best',fontsize=18)
+    ax[4,1].set_xlabel(r'$\theta_{CO}^{DFT}$ \ ML', fontsize=28)
+    ax[4,1].set_ylabel(r'$\Delta G_{CO}^{diff}$ \ eV', fontsize=28)
+    ax[4,1].annotate('j)', xy=(-0.2, 1.1),xycoords="axes fraction", fontsize=26)
+    ax[4,1].legend(loc='best',fontsize=18)
 
 
     ############################################################################
 
     fig.tight_layout()
+    figs.tight_layout()
     fig.savefig(output + 'TPD_compare.svg')
     fig.savefig(output + 'TPD_compare.pdf')
+    figs.savefig(output + 'saturation.pdf')
 
     # plt.show()
