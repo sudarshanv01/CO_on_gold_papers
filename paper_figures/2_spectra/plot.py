@@ -14,15 +14,20 @@ from parser_function import get_stable_site_vibrations, get_gas_vibrations, \
                             get_coverage_details, diff_energies, \
                             get_lowest_absolute_energies,\
                             get_differential_energy
+from parser_class import ParseInfo
 import mpmath as mp
 from ase.thermochemistry import HarmonicThermo, IdealGasThermo
 from ase.io import read
 from ase.db import connect
-import matplotlib.pyplot as plt
 from matplotlib.ticker import FormatStrFormatter
-sys.path.append('../classes/')
-from parser_class import ParseInfo
-
+import matplotlib
+matplotlib.rc('text', usetex=True)
+matplotlib.rcParams['text.latex.preamble']=[r"\usepackage{amsmath}"]
+import matplotlib.pyplot as plt
+plt.rcParams["font.family"] = "Times New Roman"
+plt.rc('axes', labelsize=32)    # fontsize of the x and y labels
+plt.rcParams['xtick.labelsize'] = 26
+plt.rcParams['ytick.labelsize'] = 26
 
 # get the atoms object
 def atoms_from_db(db, **kwargs):
@@ -66,12 +71,12 @@ if __name__ == '__main__':
     accept_states['211'] = ['CO_site_8', 'CO_site_13']
     accept_states['100'] = ['CO_site_1', 'CO_site_0']
     accept_states['110'] = ['CO_site_4', 'CO_site_1', 'CO_site_5']
-    accept_states['111'] = ['CO_site_0']
+    accept_states['111'] = ['CO_site_0', 'CO_site_1', 'CO_site_2']
     accept_states['recon_110'] = ['CO_site_1', 'CO_site_4']
 
     """ DFT databases """
     # which facets to consider
-    facets = ['211', '110', 'recon_110', '100']
+    facets = ['211', '110', '100', '111']
     ls = ['-', '--', '-.']
     # Get reference for CO in vacuum
     referencedb = connect('../databases/references_BEEF_VASP_500.db')
@@ -95,7 +100,7 @@ if __name__ == '__main__':
                     'CO_site_10':'tab:red', 'CO_site_7':'tab:blue'}
 
 
-    fig, ax = plt.subplots(len(facets), figsize=(8, 18), dpi=600)
+    fig, ax = plt.subplots(len(facets), figsize=(8, 20), dpi=600)
     inferno = cm.get_cmap('inferno', 4)
     viridis = cm.get_cmap('viridis', 5)
 
@@ -128,17 +133,17 @@ if __name__ == '__main__':
                         print(homedir)
                         continue
                 if 'recon' in facet:
-                    ax[index].annotate('Au('+facet.replace('_', '-')+')', xy=(1900, 4), weight='bold', color=colors_facet[facet])
+                    ax[index].annotate('Au('+facet.replace('_', '-')+')', xy=(1900, 4), color=colors_facet[facet])
                 else:
-                    ax[index].annotate('Au('+facet+')', xy=(2075, 4), weight='bold', color=colors_facet[facet])
+                    ax[index].annotate('Au('+facet+')', xy=(2075, 3.5), color=colors_facet[facet])
             # if index == 0:
             ax[index].plot([], [], color=viridis(ind_cell), label=coverage_labels[facet][cell] + ' ML', lw=10)
             ax[index].legend(bbox_to_anchor=(0,1.02,1,0.2), loc="lower left",
                                 mode="expand", borderaxespad=0, ncol=2)
             if index == int(len(facet)/2):
-                ax[index].set_ylabel(r'$ Intensity $ \ $ ( D / \AA )^{2} amu^{-1}$')
+                ax[index].set_ylabel(r'$ Intensity $ / $ ( D / \AA )^{2} amu^{-1}$')
             if index == 3:
-                ax[index].set_xlabel(r'Wavenumber \ $cm^{-1}$')
+                ax[index].set_xlabel(r'Wavenumber / $cm^{-1}$')
 
     plt.tight_layout()
     plt.savefig(output + 'IR.svg')

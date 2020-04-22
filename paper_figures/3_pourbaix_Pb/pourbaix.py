@@ -8,11 +8,17 @@ import numpy as np
 from useful_functions import AutoVivification
 from pprint import pprint
 from ase.db import connect
-import matplotlib.pyplot as plt
 import os, csv, sys
 sys.path.append('../classes/')
 from parser_class import ParseInfo
-
+import matplotlib
+matplotlib.rc('text', usetex=True)
+matplotlib.rcParams['text.latex.preamble']=[r"\usepackage{amsmath}"]
+import matplotlib.pyplot as plt
+plt.rcParams["font.family"] = "Times New Roman"
+plt.rc('axes', labelsize=32)    # fontsize of the x and y labels
+plt.rcParams['xtick.labelsize'] = 26
+plt.rcParams['ytick.labelsize'] = 26
 
 def main(thermodb, referdb, list_cells, facet, functional):
     pour = ParseInfo(thermodb, referdb, list_cells, facet, functional,ref_type='Pb')
@@ -121,12 +127,12 @@ if __name__ == '__main__':
                     color=colors_coverage[index], lw=4,  label=r'$\theta = $ ' + coverage_labels[facet][cell] + ' ML')
 
 
-            ax1[0,ind].tick_params(axis='both', which='major', labelsize=22)
+            # ax1[0,ind].tick_params(axis='both', which='major', labelsize=22)
             if ind == 0:
-                ax1[0,ind].set_ylabel(r'$\Delta E_{Pb}$ \ eV', fontsize=32)
-                ax1[1,ind].set_ylabel(r'$j$ \ $\mu A cm^{-2}$', fontsize=32)
+                ax1[0,ind].set_ylabel(r'$\Delta E_{Pb}$ / eV', fontsize=32)
+                ax1[1,ind].set_ylabel(r'$j$ / $\mu A cm^{-2}$', fontsize=32)
             # if ind == 1:
-            ax1[1,ind].set_xlabel(r'Potential vs SHE \ V', fontsize=32)
+            ax1[1,ind].set_xlabel(r'Potential vs SHE / V', fontsize=32)
             ax1[0,ind].set_ylim([-0.7, 0.7])
             ax1[0,ind].set_xlim([-0.7, 0.7])
             ax1[0,ind].legend(bbox_to_anchor=(0,1.02,1,0.2), loc="lower left",
@@ -136,12 +142,12 @@ if __name__ == '__main__':
             # ax1[0,ind].spines['bottom'].set_visible(False)
 
             ax1[0,ind].annotate(r'Au(' +facet.replace('recon_', 'recons-') + ')', xy=(0.03, 0.9), \
-                    xycoords="axes fraction", fontsize=24, color='tab:brown', weight='bold')
+                    xycoords="axes fraction", fontsize=28, color='tab:brown', weight='bold')
 
-            ax1[0,ind].annotate(alphabets[ind] + ')', xy=(-0.1, 1.1),xycoords="axes fraction", fontsize=24)
+            ax1[0,ind].annotate(alphabets[ind] + ')', xy=(-0.1, 1.1),xycoords="axes fraction", fontsize=32)
 
 
-            ax1[1,ind].tick_params(axis='both', which='major', labelsize=22)
+            # ax1[1,ind].tick_params(axis='both', which='major', labelsize=22)
             ax1[1,ind].set_ylim(j_ylim[facet])
 
         ax1[0,ind].axhline(y=0, color='k', ls='-', lw=4, )
@@ -155,4 +161,5 @@ if __name__ == '__main__':
 
     plt.tight_layout()
     plt.savefig(output + 'lead_UPD.pdf')
+    plt.savefig(output + 'lead_UPD.png')
     plt.show()
