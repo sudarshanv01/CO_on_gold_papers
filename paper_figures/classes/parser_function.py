@@ -3,7 +3,7 @@
 
 """ Functions for parsing and plotting data related to the Gold project """
 
-from useful_classes import experimentalTPD
+from parser_class import experimentalTPD
 import numpy as np
 from glob import glob
 from useful_functions import AutoVivification, get_vibrational_energy
