@@ -6,6 +6,7 @@
 from parser_class import experimentalTPD
 import numpy as np
 from glob import glob
+import matplotlib
 from useful_functions import AutoVivification, get_vibrational_energy
 from pprint import pprint
 import matplotlib.pyplot as plt
@@ -15,6 +16,70 @@ from ase.thermochemistry import HarmonicThermo, IdealGasThermo
 from ase.io import read
 from ase.db import connect
 from matplotlib.ticker import FormatStrFormatter
+from matplotlib import cm
+
+
+def get_constants():
+    """ Constants """
+    pco = 101325. #pressure of CO
+
+    """ TPD data """
+    # For 211 TPD
+    T_switch_211 = [170] #[110, 170] #[110, 165, 175] #K converting between 111 and 211 step
+    T_max_211 = 250 #K Where the TPD spectra ends
+    T_rate_min_211 = [250, 300] #K Where the rate becomes zero - baseline
+    beta_211 = 3 #k/s Heating rate
+    data_211 = [T_switch_211, T_max_211, T_rate_min_211, beta_211]
+
+
+    # For 310 TPD
+    T_switch_310 = [150] # K converting between 100 and 110
+    T_max_310 = 240 # K Where the TPD spectra ends
+    T_rate_min_310 = [230 , 250] #K Where the rate becomes zero - baseline
+    beta_310 = 5 #k/s Heating rate
+    data_310 = [T_switch_310, T_max_310, T_rate_min_310, beta_310]
+
+    return {
+            #'pco':pco,
+            '211':data_211,
+            '310':data_310
+            }
+
+def accept_states():
+    # states that need to be plotted for each surface facet
+    accept_states = {}
+    accept_states['211'] = ['CO_site_8']
+    accept_states['100'] = ['CO_site_1']
+    accept_states['110'] = ['CO_site_4']
+    accept_states['111'] = ['CO_site_0']
+    accept_states['recon_110'] = ['CO_site_1']
+    return accept_states
+
+def stylistic_comp():
+    # Decide stylistic things
+    """ Stylistic """
+    colors_facet = {'211':'tab:blue', '111-0':'tab:green','111-1':'tab:green', '100':'tab:red',\
+                    '110':'tab:brown', 'recon_110':'tab:cyan', '111':'tab:green'}
+    ls_facet = {'211':'-', '111-0':'--', '111-1':'-.', '110':'-', '100':'--', '111':'--'}
+    colors = ['tab:blue', 'tab:brown', 'tab:green', 'tab:red', 'tab:purple', \
+        'tab:orange', 'tab:pink', 'tab:gray', 'tab:olive', 'tab:cyan',\
+        'r', 'b', 'g'] # List of colours
+    colors_state = {'CO_site_8':'tab:brown', 'CO_site_13':'tab:olive', \
+                    'CO_site_10':'tab:red', 'CO_site_7':'tab:blue'}
+
+    return colors_facet, ls_facet, colors, colors_state
+
+def stylistic_exp():
+    # inferno = cm.get_cmap('Oranges',20)
+    # inferno = matplotlib.colors.ListedColormap(inferno[10:,:-1])
+
+    cmap = matplotlib.cm.Oranges(np.linspace(0,1,2))
+    cmap = matplotlib.colors.ListedColormap(cmap[1:,:-1])
+
+    viridis = cm.get_cmap('Blues', 12)
+    font_number = 32 # size of a b c ...
+    return cmap, viridis, font_number
+
 
 def get_stable_site_vibrations():
     vibration_energies = {}
@@ -22,6 +87,15 @@ def get_stable_site_vibrations():
     vibration_energies['111'] = 0.00012 * np.array([2084.8, 201.7, 110.3, 110.2, 70.7, 70.8])
     vibration_energies['100'] = 0.00012 * np.array([1886.5, 315.2, 273.4, 222.2, 152.7, 49.8])
     vibration_energies['110'] = 0.00012 * np.array([2054.5, 262.9, 183.4, 147.3, 30.9, 30.])
+
+    return vibration_energies
+
+def get_adsorbate_vibrations():
+    vibration_energies = {}
+    vibration_energies['211'] = HarmonicThermo(0.00012 * np.array([2044.1, 282.2, 201.5, 188.5, 38.3, 11.5]))
+    # vibration_energies['111'] = HarmonicThermo(0.00012 * np.array([2084.8, 201.7, 110.3, 110.2, 70.7, 70.8]))
+    # vibration_energies['100'] = HarmonicThermo(0.00012 * np.array([1886.5, 315.2, 273.4, 222.2, 152.7, 49.8]))
+    vibration_energies['310'] = HarmonicThermo(0.00012 * np.array([2054.5, 262.9, 183.4, 147.3, 30.9, 30.]))
 
     return vibration_energies
 
