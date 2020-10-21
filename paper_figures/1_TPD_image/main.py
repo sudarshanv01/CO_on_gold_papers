@@ -26,37 +26,43 @@ from parser_function import get_stable_site_vibrations, get_gas_vibrations, \
                             accept_states, stylistic_exp, \
                             get_adsorbate_vibrations, \
                             stylistic_comp
+from plot_params import get_plot_params
 
 from tpd import PlotTPD
 from dft import PlotDFT
 
-import matplotlib.pyplot as plt
-plt.style.use('science')
 from scipy import optimize
-from matplotlib.ticker import FormatStrFormatter
 from docx import Document 
 from docx.shared import Cm, Pt
+import matplotlib.pyplot as plt
 
 if __name__ == '__main__':
 
+    ## This is where all the output is stored
     output = 'output_figures/'
     os.system('mkdir -p ' + output)
+
+    ## Create the needed plot parameters
+    get_plot_params()
 
     # Main figure for the paper
     fig, ax = plt.subplots(4, 2, figsize=(20, 22)) # figure for the paper
 
     # facets to consider in this plot
-    facets = ['211', '310']
-    correct_background = {'211':True, '310':False}
-    bounds_facets = {'211':[], '310':[]}
+    facets = ['211', '310'] ## These are the two TPD spectra we have
+    correct_background = {'211':True, '310':False} ## Choose to correct the background
+    bounds_facets = {'211':[], '310':[]} ## Specify bounds for the coverage
+
     # the DFT facets to consider 
     dft_facets = ['211', '111', '100', '110']
     ## Must have a correspoding csv file with TPD data
     exp_data = {'211': glob('input_TPD/Au_211/*.csv'),
                 '310': glob('input_TPD/Au_310/*.csv')}
+
     ## Optional: Image to put next to the TPD plot
     image_data = {'211':plt.imread('surface_sites/gold_211.png'),
                   '310':plt.imread('surface_sites/gold_310.png')}
+
     # Reaction order
     order = 1
     # Get defaults constants for CO on Au
@@ -81,6 +87,7 @@ if __name__ == '__main__':
     for facet in facets:
         allE0[facet] = []
     
+    # Word document to store the tables
     word_document = Document()
 
     for index, facet in enumerate(facets):
@@ -98,6 +105,8 @@ if __name__ == '__main__':
         # Plot the main figure
         ## Iterate over every surface facet ( 211 , 111, etc)
         for surface_index, facet_no in enumerate(TPDClass.results):
+
+            ## Prepare word document for the TPD
             table = word_document.add_table(0,0)
             table.style = 'TableGrid'
             table.add_column(Cm(10)) ## Exposure
@@ -112,6 +121,7 @@ if __name__ == '__main__':
             row.cells[2].text = r'\Delta E_{\theta \to 0} \ (eV)'
             row.cells[3].text = 'Residual (eV)'
             row.cells[4].text = 'b (eV)'
+
             # iterate over the exposures
             # Plot the TPD in normalised form
             for index_exposure, exposure in enumerate(sorted(TPDClass.results[surface_index])):
@@ -166,6 +176,7 @@ if __name__ == '__main__':
                 row.cells[3].text = str(round(TPDClass.error[surface_index][exposure],3))
                 row.cells[4].text = str(round(TPDClass.b[surface_index][exposure],2))
             word_document.add_page_break()
+
         ## Managing labels for main plot
         # for i in range(len(ax[0,:])):
         ax[0,index].set_xlabel(r'Temperature / K')
@@ -285,13 +296,11 @@ if __name__ == '__main__':
     # Add schematics of 211 and 310 
     for facet in image_data:
         if facet == '211':    
-            newax = fig.add_axes([0.40, 0.8, 0.12, 0.12], anchor='NE', zorder=-1)
+            newax = fig.add_axes([0.38, 0.8, 0.12, 0.12], anchor='NE', zorder=-1)
         elif facet == '310':
-            newax = fig.add_axes([0.88, 0.8, 0.12, 0.12], anchor='NE', zorder=-1)
+            newax = fig.add_axes([0.86, 0.8, 0.12, 0.12], anchor='NE', zorder=-1)
         newax.imshow(image_data[facet])
         newax.axis('off')
 
     fig.tight_layout()
     fig.savefig(os.path.join(output,'main_figure.pdf'))
-
-    ## Write out important i

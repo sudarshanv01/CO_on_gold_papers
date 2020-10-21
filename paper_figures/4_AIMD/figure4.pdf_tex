@@ -67,7 +67,7 @@
     \put(0.1425641,0.52738225){\color[rgb]{0,0,0}\makebox(0,0)[lt]{\lineheight{1.25}\smash{\begin{tabular}[t]{l}Au(211)\end{tabular}}}}%
     \put(0.59502719,0.52738225){\color[rgb]{0,0,0}\makebox(0,0)[lt]{\lineheight{1.25}\smash{\begin{tabular}[t]{l}Au(100)\end{tabular}}}}%
     \put(0.38461538,0.60688626){\color[rgb]{0,0,0}\makebox(0,0)[lt]{\lineheight{1.25}\smash{\begin{tabular}[t]{l}\phi_{pzc} = 0.47 V_{SHE}\end{tabular}}}}%
-    \put(0.00313783,0.04718218){\color[rgb]{0,0,0}\makebox(0,0)[lt]{\lineheight{1.25}\smash{\begin{tabular}[t]{l}$\delta E / \delta G (eV)$\end{tabular}}}}%
+    \put(0.00313783,0.04718218){\color[rgb]{0,0,0}\makebox(0,0)[lt]{\lineheight{1.25}\smash{\begin{tabular}[t]{l}$\sigma_{E} / \sigma_{G} (eV)$\end{tabular}}}}%
     \put(0.39383147,0.04590573){\color[rgb]{0,0,0}\makebox(0,0)[lt]{\lineheight{1.25}\smash{\begin{tabular}[t]{l}0.14\end{tabular}}}}%
     \put(0.88710709,0.04590033){\color[rgb]{0,0,0}\makebox(0,0)[lt]{\lineheight{1.25}\smash{\begin{tabular}[t]{l}0.31\end{tabular}}}}%
     \put(0.20023747,0.04690634){\color[rgb]{0,0,0}\makebox(0,0)[lt]{\lineheight{1.25}\smash{\begin{tabular}[t]{l}-\end{tabular}}}}%

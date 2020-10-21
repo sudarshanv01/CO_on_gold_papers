@@ -2,7 +2,6 @@
 
 """ Script to compare TPD for different Gold facets """
 
-from useful_classes import experimentalTPD
 import numpy as np
 from glob import glob
 from useful_functions import AutoVivification, get_vibrational_energy
@@ -20,14 +19,11 @@ from ase.thermochemistry import HarmonicThermo, IdealGasThermo
 from ase.io import read
 from ase.db import connect
 from matplotlib.ticker import FormatStrFormatter
-import matplotlib
-matplotlib.rc('text', usetex=True)
-matplotlib.rcParams['text.latex.preamble']=[r"\usepackage{amsmath}"]
+# matplotlib.rc('text', usetex=True)
+# matplotlib.rcParams['text.latex.preamble']=[r"\usepackage{amsmath}"]
 import matplotlib.pyplot as plt
-plt.rcParams["font.family"] = "Times New Roman"
-plt.rc('axes', labelsize=32)    # fontsize of the x and y labels
-plt.rcParams['xtick.labelsize'] = 26
-plt.rcParams['ytick.labelsize'] = 26
+from plot_params import get_plot_params
+
 
 # get the atoms object
 def atoms_from_db(db, **kwargs):
@@ -47,6 +43,9 @@ output = 'output/'
 os.system('mkdir -p ' + output)
 
 if __name__ == '__main__':
+
+    get_plot_params()
+
 
 
     """ Frequencies for stable sites """

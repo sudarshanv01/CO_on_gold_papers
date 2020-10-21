@@ -13,14 +13,13 @@ sys.path.append('../classes/')
 from parser_class import ParseInfo
 import matplotlib
 import matplotlib.image as mpimg
-# matplotlib.rc('text', usetex=True)
-# matplotlib.rcParams['text.latex.preamble']=[r"\usepackage{amsmath}"]
+matplotlib.rc('text', usetex=True)
+matplotlib.rcParams['text.latex.preamble']=[r"\usepackage{amsmath}"]
 import matplotlib.pyplot as plt
-# plt.rcParams["font.family"] = "Times New Roman"
-plt.style.use('science')
-plt.rc('axes', labelsize=32)    # fontsize of the x and y labels
-plt.rcParams['xtick.labelsize'] = 26
-plt.rcParams['ytick.labelsize'] = 26
+# plt.rc('axes', labelsize=32)    # fontsize of the x and y labels
+# plt.rcParams['xtick.labelsize'] = 26
+# plt.rcParams['ytick.labelsize'] = 26
+from plot_params import get_plot_params
 
 def main(thermodb, referdb, list_cells, facet, functional):
     pour = ParseInfo(thermodb, referdb, list_cells, facet, functional,ref_type='Pb')
@@ -31,6 +30,8 @@ if __name__ == '__main__':
     ## Details
     output = 'output/'
     os.system('mkdir -p ' + output)
+
+    get_plot_params()
 
     # facets
     facets = ['111', '100', '110',  '211', ] # 'recon_110'
@@ -85,7 +86,7 @@ if __name__ == '__main__':
     potential_range = np.linspace(-1.4, 1.4)
 
     # Plot related
-    fig, ax1 = plt.subplots(len(facets)+2, 2, sharex=True, figsize=(12, 20))
+    fig, ax1 = plt.subplots(len(facets)+2, 2, sharex=True, figsize=(12, 24))
     gs = ax1[-1, -1].get_gridspec()
     for ax in ax1[len(facets)+1, : ]:
         ax.remove()
@@ -133,7 +134,7 @@ if __name__ == '__main__':
                 try:
                     data_facet.append([float(a) for a in row])
                 except ValueError:
-                    print('Error')
+                    print('')
 
         experiments[facet] = np.array(data_facet).transpose()
 
@@ -171,14 +172,14 @@ if __name__ == '__main__':
                 # mode="expand", borderaxespad=0, ncol=3, fontsize=22)
             if ind == 0:
                 ax1[ind,0].annotate(r'$\mathbf{\theta} = $ ' + coverage_labels[facet][cell] + ' ML', 
-                                xy=(0.65, 0.1+  0.15 * index), xycoords="axes fraction", color=colors_coverage[index]).draggable()
+                                xy=(0.65, 0.05+  0.15 * index), backgroundcolor="w", \
+                                    xycoords="axes fraction", color=colors_coverage[index]).draggable()
             else:
                 ax1[ind,0].annotate(r'$\mathbf{\theta} = $ ' + coverage_labels[facet][cell] + ' ML', 
-                                xy=(0.03, 0.6 + 0.15 * index), xycoords="axes fraction", color=colors_coverage[index]).draggable()
+                                xy=(0.03, 0.5 + 0.15 * index), backgroundcolor="w", \
+                                     xycoords="axes fraction", color=colors_coverage[index]).draggable()
             ax1[ind,0].xaxis.set_ticks_position('bottom')
             ax1[ind,1].xaxis.set_ticks_position('bottom')
-            # ax1[ind,1].spines['top'].set_visible(False)
-            # ax1[ind,1].spines['bottom'].set_visible(False)
 
             ax1[ind,1].annotate(r'Au(' +facet.replace('recon_', 'recons-') + ')', xy=(0.03, 0.5), \
                     xycoords="axes fraction", fontsize=28, color='tab:brown', weight='bold')
@@ -186,22 +187,19 @@ if __name__ == '__main__':
             ax1[ind,0].annotate(alphabets[ind] + ')', xy=(-0.1, 1.1),xycoords="axes fraction", fontsize=32)
 
 
-            ax1[ind,0].tick_params(axis='both', which='major', labelsize=22)
-            ax1[ind,1].tick_params(axis='both', which='major', labelsize=22)
+            # ax1[ind,0].tick_params(axis='both', which='major', labelsize=22)
+            # ax1[ind,1].tick_params(axis='both', which='major', labelsize=22)
             ax1[ind,1].set_ylim(j_ylim[facet])
 
         ax1[ind,0].axhline(y=0, color='k', ls='-', lw=4, )
-
-
 
         for i in range(len(p_all)-1):
             points_inter = (p_all[i+1] - p_all[i]).r
             ax1[ind,0].axvline(x=points_inter, ls='--', color='grey')
             ax1[ind,1].axvline(x=points_inter, ls='--', color='grey')
 
-    # plt.subplots_adjust(hspace=.0)
 
     plt.tight_layout()
     plt.savefig(output + 'lead_UPD.pdf', dpi=300)
-    plt.savefig(output + 'lead_UPD.png')
+    plt.savefig(output + 'lead_UPD.png', dpi=300)
     plt.show()
