@@ -1,8 +1,26 @@
-# Interaction of CO with poly-crystalline Gold in gas-phase and electrochemical environments
+Gold Papers
+==========
 
-This repository containts all the scripts and ASE databases in order to reproduce the figures of the paper
+This directory contains all the scripts needed to generate plots for two gold papers. 
 
-1. 1_TPD_image: Figure 1 of the manuscript containing classes for different steps involved in analysis of a TPD spectra. Detailed documentation in the folder.
-2. 2_spectra: ATR-SEIRAS image
-3. 3_pourbaix_Pb: Scripts to generate the Pourbaix diagram 
-4. 4_AIMD: Scripts for plotting AIMD trajectories
+1. How to extract the adsorption energies, adsorbate-adsorbate interaction parameters, and saturation coverages with temperature programmed desorption experiments *benchmark_paper*
+
+### TPD analysis
+
+Code to parse TPD
+
+2. Interaction of CO with gold under gas phase and electrochemical environments *electrochemical_gas_phase_paper*
+
+
+### Experimental plot
+Data for the experiments and figure from Thomas
+
+### Pourbaix
+Creates the pourbaix diagram (Figure 2 of the manuscript)
+
+### Water adsorption
+Au(310) single water adsorption
+
+### AIMD 
+Parsed AIMD result in svg format
+
