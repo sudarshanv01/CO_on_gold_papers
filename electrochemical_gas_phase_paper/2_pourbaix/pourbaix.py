@@ -200,5 +200,5 @@ if __name__ == '__main__':
 
     plt.tight_layout()
     plt.savefig(output + 'lead_UPD.pdf', )
-    plt.savefig(output + 'lead_UPD.png', )
+    plt.savefig(output + 'lead_UPD.png', dpi=600)
     plt.show()

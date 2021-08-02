@@ -10,6 +10,7 @@ from ase.thermochemistry import HarmonicThermo, IdealGasThermo
 from ase.io import read
 from ase.db import connect
 import matplotlib
+from ase import units
 
 def get_gas_vibrations():
     atoms = read('input_data/co.traj')
@@ -43,8 +44,8 @@ def get_coverage_details():
                   '111': {'1x1':1, '2x2':1/4, '3x3':1/9},
                   '110': {'1x1':1, '2x2':1/4, '3x3':1/9},
                   'recon_110':{'1x1':1, '2x1':1/2, '3x1':1/3},
-                  '310':{'2x4':1, '4x4':1/2, '6x4':1/3, '8x4':1/4, \
-                            '4x8':1/4, '6x8':1/6, '8x8':1/8, '6x12':1/9, },
+                  '310':{'1x4':1, '2x4':1/2, '3x4':1/3, '4x4':1/4}
+                            # '4x8':1/4, '6x8':1/6, '8x8':1/8, '6x12':1/9, },
                 }
     coverage_labels = {
                   '100': {'1x1':'1', '2x2':r'$\frac{1}{4}$', '3x3':r'$\frac{1}{9}$'},
@@ -54,6 +55,8 @@ def get_coverage_details():
                   'recon_110':{'1x1':'1', '2x1':r'$\frac{1}{2}$', '3x1':r'$\frac{1}{3}$'},
                   }
     return cell_sizes, coverages_cell, coverage_labels
+
+
 
 class PlotDFT():
     def __init__(self, database, reference_database, facet, functional):
@@ -92,12 +95,21 @@ class PlotDFT():
 
         self.chosen_sites = {}
         self.chosen_sites['211'] = 'CO_site_8'
-        self.chosen_sites['310'] = 'CO_site_11'
-        self.chosen_sites['111'] = 'CO_site_0'
+        self.chosen_sites['310'] = 'CO_site_7'
+        self.chosen_sites['111'] = 'CO_site_11'
         self.chosen_sites['100'] = 'CO_site_1'
 
         # Outline 
         self.get_data()
+
+    def configurational_entropy(self, theta, T):
+        ## the integral entropy
+        kB = units.kB
+        try:
+            SintT = -1 * kB * T * np.log(theta / (1 - theta)) - kB * T / theta * np.log(1 - theta)
+        except ZeroDivisionError:
+            SintT = 0 # there is no integral config entropy at exactly 1ML coverage
+        return SintT
 
     def parse_data(self):
         for row in self.database.select(facets='facet_%s'%self.facet, \
@@ -146,15 +158,17 @@ class PlotDFT():
             ## find the minimum energy
             all_CO_energies = []
             all_sites = []
-            if self.facet in ['211', '310']:
+            if self.facet in ['211']:
                 mult_factor = n
+            elif self.facet in ['310']:
+                mult_factor = n  
             else:
                 mult_factor = n**2
             n_CO[theta] = mult_factor
             print(self.facet, cell, mult_factor)
             for state in self.results[cell]:
-                # if state != 'slab':
-                if state in self.chosen_sites[self.facet]:
+                if state != 'slab':
+                # if state in self.chosen_sites[self.facet]:
                     all_CO_energies.append(mult_factor * self.results[cell][state])
                     all_sites.append(state)
             absolute_energies[theta] = np.min(all_CO_energies)
@@ -167,17 +181,21 @@ class PlotDFT():
         all_theta = [] 
         all_n = []
         delta_zpe =  self.thermo_ads.get_ZPE_correction() - self.thermo_gas.get_ZPE_correction()
-        free_ads = self.thermo_ads.get_helmholtz_energy(temperature=298, verbose=False)
-        free_gas = self.thermo_gas.get_gibbs_energy(temperature=298, \
+        free_ads = self.thermo_ads.get_helmholtz_energy(temperature=298.15, verbose=False)
+        free_gas = self.thermo_gas.get_gibbs_energy(temperature=298.15, \
                                                     pressure=101325, verbose=False)
         for i, theta in enumerate(sorted(absolute_energies)):
+            print(theta)
             if i == 0:
                 Ediff = ( absolute_energies[theta] - slab_energies[theta] - n_CO[theta] * COg ) / n_CO[theta]  \
-                         + free_ads - free_gas #+ delta_zpe 
+                         + free_ads - free_gas - self.configurational_entropy(theta, 298.15)
+                print(self.configurational_entropy(theta, 298.15) )
             else:
                 delta_n = n_CO[theta] - all_n[i-1] 
                 Ediff = (absolute_energies[theta] - all_E[i-1] - delta_n * COg ) / delta_n \
-                            + free_ads - free_gas #+ delta_zpe 
+                            + free_ads - free_gas \
+                            - self.configurational_entropy(theta, 298.15) \
+                            + self.configurational_entropy(all_theta[i-1], 298.15 )
             Eint = ( absolute_energies[theta] - slab_energies[theta] - n_CO[theta] *  COg )  / n_CO[theta]  \
                          + delta_zpe
             all_Eint.append(Eint)
@@ -185,6 +203,11 @@ class PlotDFT():
             all_E.append(absolute_energies[theta])
             all_n.append(n_CO[theta])
             all_theta.append(theta)
+        
+        ## alternative differential energy 
+        dEdtheta = np.diff(all_Eint) / np.diff(all_theta)
+        dEdtheta = [all_Eint[0]] + dEdtheta.tolist()
+        # print('dEdtheta', dEdtheta)
 
         
         self.dEdiff = all_Ediff

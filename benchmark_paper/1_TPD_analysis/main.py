@@ -55,7 +55,7 @@ if __name__ == '__main__':
     
 
     fig1, ax1 = plt.subplots(2, 3, figsize=(14,8), squeeze=False)
-    fig2, ax2 = plt.subplots(1, 2, figsize=(10,4.5), squeeze=False)
+    fig2, ax2 = plt.subplots(1, 2, figsize=(12.5,4.5), squeeze=False)
     fig3, ax3 = plt.subplots(1, 1, figsize=(7,5), squeeze=False)
     fig4, ax4 = plt.subplots(1, 2, figsize=(10,5), squeeze=False)
 
@@ -143,11 +143,13 @@ if __name__ == '__main__':
                     ax2[0,1].plot(TPDClass.theta_rel[surface_index][exposure], 
                                 config_term, 
                                 '-', color=cmap(index_exposure),
+                                label='Au(%s):%1.2fL'%(facet,exposure),
                     )
                     ax2[0,0].errorbar(exposure, TPDClass.E0[surface_index][exposure], TPDClass.error[surface_index][exposure], color=cmap(index_exposure))
                     ax3[0,0].plot(TPDClass.plot_temperature, \
                                 TPDClass.theta_eq[surface_index][exposure],
                                 color=cmap(index_exposure),
+                                label='Au(%s):%1.2fL'%(facet,exposure),
                                 ls='-', lw=4)
                     ax3[0,0].fill_between(TPDClass.plot_temperature,
                                 TPDClass.theta_eq_p[surface_index][exposure],
@@ -171,12 +173,12 @@ if __name__ == '__main__':
                             color=cmap(index_exposure), 
                             )
 
-        ax2[0,0].plot([], [], 'o-',  label='Au(%s)'%facet, color=cmap(index_exposure))
-        ax3[0,0].plot([], [], '-',  label='Au(%s)'%facet, color=cmap(index_exposure))
+        # ax2[0,0].plot([], [], 'o-',  label='Au(%s)'%facet, color=cmap(index_exposure))
+        # ax3[0,0].plot([], [], '-',  label='Au(%s)'%facet, color=cmap(index_exposure))
         for i in range(len(ax1)):
             ax1[i,1].set_xlabel(r'$\theta_{\mathregular{rel}}$')
             ax1[i,1].set_ylabel(r'$G_{\mathregular{d}}$ / eV')
-            ax1[i,0].set_ylabel(r'Norm. rate')
+            ax1[i,0].set_ylabel(r'Rate')
             ax1[i,0].set_xlabel(r'Temperature / K')
         ax2[0,0].set_ylabel(r'$\Delta \mathregular{E}_{\theta \to 0}$ / eV')
         ax2[0,0].set_xlabel(r'Exposure / L')
@@ -230,11 +232,12 @@ if __name__ == '__main__':
 
     ax2[0,1].plot([], [], ls='-', color='k', label='Configurational entropy ')
     ax2[0,1].plot([], [], ls='-.',color='k', label='CO*-CO* Interactions ')
-    ax2[0,1].legend(loc='best', frameon=False, fontsize=12)
-    ax2[0,0].legend(loc='lower right', frameon=False, fontsize=12)
-    ax3[0,0].legend(loc='best', frameon=False, fontsize=12)
+    ax2[0,0].set_xscale('log')
+    ax2[0,1].legend(bbox_to_anchor=(1.04,1), borderaxespad=0, frameon=False, fontsize=10)
+    # ax2[0,0].legend(loc='lower right', frameon=False, fontsize=12)
+    ax3[0,0].legend(loc='lower left', frameon=False, fontsize=10)
     ax3[0,0].annotate(r'$p_{\mathregular{CO}(\mathregular{g})} = 1 \mathregular{bar}$', \
-                           xy=(0.1, 0.3), xycoords='axes fraction' )
+                           xy=(0.6, 0.7), xycoords='axes fraction' )
 
 
     for i, facet in enumerate(image_data):
@@ -312,9 +315,9 @@ if __name__ == '__main__':
              color=colors_facet[facet])
         ax4[0,1].errorbar(dft_data.coverage, dft_data.dEdiff, dft_data.beef_error[facet],alpha=0.25,\
               color=colors_facet[facet])
+        print(dft_data.dEint)
+        print(dft_data.dEdiff)
     # handles, labels = ax4[0,0].get_legend_handles_labels()
-    ax4[0,1].legend(loc="best", frameon=False, fontsize=12)
-    ax4[0,0].legend(loc='upper left', frameon=False, fontsize=12)
 
     # fig4.legend(handles, labels, bbox_to_anchor=(0,1.02,1,0.2), loc="lower left",
                 # mode="expand", borderaxespad=0, ncol=2)
@@ -323,6 +326,9 @@ if __name__ == '__main__':
     ax4[0,0].set_ylabel(r'$\Delta \mathregular{E} + \Delta \mathregular{ZPE}$ / eV')
     ax4[0,1].set_xlabel(r'$\theta$ / ML')
     ax4[0,1].set_ylabel(r'$\Delta \mathregular{G}_{\mathregular{diff}}$ / eV')
+    ax4[0,0].axhline(-0.58, label='Redhead analysis', color='tab:purple', ls='-.')
+    ax4[0,1].legend(loc="best", frameon=False, fontsize=12)
+    ax4[0,0].legend(loc='upper left', frameon=False, fontsize=12)
 
 
     for i, a in enumerate(ax4.flatten()):
