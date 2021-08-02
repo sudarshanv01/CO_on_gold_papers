@@ -1,26 +1,8 @@
-Gold Papers
-==========
-
-This directory contains all the scripts needed to generate plots for two gold papers. 
-
-1. How to extract the adsorption energies, adsorbate-adsorbate interaction parameters, and saturation coverages with temperature programmed desorption experiments *benchmark_paper*
-
-### TPD analysis
-
-Code to parse TPD
-
-2. Interaction of CO with gold under gas phase and electrochemical environments *electrochemical_gas_phase_paper*
+Gold-CO papers
+--------------
 
 
-### Experimental plot
-Data for the experiments and figure from Thomas
+Scripts used to generate figures for:
 
-### Pourbaix
-Creates the pourbaix diagram (Figure 2 of the manuscript)
-
-### Water adsorption
-Au(310) single water adsorption
-
-### AIMD 
-Parsed AIMD result in svg format
-
+1. How to Extract Adsorption Energies, Adsorbate-adsorbate Interaction Parameters, and Saturation Coverages from Temperature Programmed Desorption Experiments (10.26434/chemrxiv.14525496.v2)
+2.  Interaction of CO with Gold in an Electrochemical Environment (10.26434/chemrxiv.13138988.v2)
