@@ -7,6 +7,8 @@ import json
 from aiida.tools.groups import GroupPath
 from ase import Atoms
 from ase import build
+from aiida.common.extendeddicts import AttributeDict
+
 
 """
 Relax the cell for different functionals 
@@ -23,10 +25,6 @@ def calculator():
             'lorbit': 11,
             'nelm': 100,
             'prec': 'Accurate',
-            'ediffg': -0.02,
-            'ediff': 1e-7,
-            'isif': 3,
-            'nsw': 100,
             'gga': 'RP',
         }
 
@@ -42,10 +40,12 @@ def runner(structure):
     VerifyVasp = WorkflowFactory('vasp.verify')
 
     # generate the inputs
-    builder = VerifyVasp.get_builder()
+    builder = RelaxVasp.get_builder()
 
     builder.metadata.label = 'Lattice Relaxation Calculation'
     builder.metadata.description = 'Relaxing for generating vacancies'
+
+    builder.verbose = orm.Bool(True)
 
     # set the code
     code = load_code('vasp-5.4.4@dtu_xeon8')
@@ -64,7 +64,7 @@ def runner(structure):
 
     # set the parameters
     parameters = calculator() 
-    builder.parameters = Dict(dict=parameters)
+    builder.parameters = orm.Dict(dict=parameters)
 
     # set the PAW potentials
     builder.potential_family = orm.Str('PBE.54')
@@ -78,11 +78,18 @@ def runner(structure):
 
     # settings dics
     # parser_settings = {'output_params': ['total_energies', 'maximum_force']}
-    parser_settings = {'add_misc':True, 'add_structure':True} 
-    builder.settings = orm.Dict(dict=parser_settings)
+    settings = {'parser_settings': {}} 
+    builder.settings = orm.Dict(dict=settings) 
 
+    builder.relax.perform = orm.Bool(True)
+    builder.relax.algo = orm.Str('cg')
+    builder.relax.force_cutoff = orm.Float(1e-2)
+    builder.relax.positions = orm.Bool(True)
+    builder.relax.shape = orm.Bool(True)
+    builder.relax.volume = orm.Bool(True)
+    builder.relax.steps = orm.Int(100)
 
-    calculation = submit( VerifyVasp, **builder)
+    calculation = submit( RelaxVasp, **builder)
     path = GroupPath()
     path["lattices/RPBE"].get_group().add_nodes(calculation)
 

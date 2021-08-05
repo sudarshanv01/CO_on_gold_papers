@@ -7,19 +7,25 @@ import json
 from aiida.tools.groups import GroupPath
 from ase import Atoms
 from ase import build
+from pathlib import Path
 
-def runner(structure):
+
+"""
+Sample all possible adsorption sites for a given structure
+"""
+
+def runner(structure, parameters, kpoint_mesh, dynamics=[]):
 
     # use the base VASP workchain
-    BaseVasp = WorkflowFactory('vasp.vasp')
     RelaxVasp = WorkflowFactory('vasp.relax')
-    VerifyVasp = WorkflowFactory('vasp.verify')
 
     # generate the inputs
-    builder = VerifyVasp.get_builder()
+    builder = RelaxVasp.get_builder()
 
     builder.metadata.label = 'Lattice Relaxation Calculation'
     builder.metadata.description = 'Relaxing for generating vacancies'
+
+    builder.verbose = orm.Bool(True)
 
     # set the code
     code = load_code('vasp-5.4.4@dtu_xeon8')
@@ -33,12 +39,14 @@ def runner(structure):
     # k-points
     KpointsData = DataFactory('array.kpoints')
     kpoints = KpointsData()
-    kpoints.set_kpoints_mesh([12, 12, 12])
+    kpoints.set_kpoints_mesh(kpoint_mesh)
     builder.kpoints = kpoints
 
     # set the parameters
-    parameters = calculator() 
-    builder.parameters = Dict(dict=parameters)
+    builder.parameters = orm.Dict(dict=parameters)
+
+    # set dynamics
+    builder.dynamics = dynamics
 
     # set the PAW potentials
     builder.potential_family = orm.Str('PBE.54')
@@ -47,30 +55,72 @@ def runner(structure):
     # setup options
     options = {}
     options['resources'] = {'num_machines': 1}
-    options['max_wallclock_seconds'] = 30 * 60
+    options['max_wallclock_seconds'] = 60 * 60
     builder.options = orm.Dict(dict=options)
 
     # settings dics
-    # parser_settings = {'output_params': ['total_energies', 'maximum_force']}
-    parser_settings = {'add_misc':True, 'add_structure':True} 
-    builder.settings = orm.Dict(dict=parser_settings)
+    settings = {'parser_settings': {}} 
+    builder.settings = orm.Dict(dict=settings) 
 
+    builder.relax.perform = orm.Bool(True)
+    builder.relax.algo = orm.Str('cg')
+    builder.relax.force_cutoff = orm.Float(1e-2)
+    builder.relax.positions = orm.Bool(True)
+    builder.relax.shape = orm.Bool(False)
+    builder.relax.volume = orm.Bool(False)
+    builder.relax.steps = orm.Int(500)
 
-    calculation = submit( VerifyVasp, **builder)
-    path = GroupPath()
-    path["lattices/RPBE"].get_group().add_nodes(calculation)
+    calculation = submit( RelaxVasp, **builder)
+    #path = GroupPath()
+    #path["lattices/RPBE"].get_group().add_nodes(calculation)
 
 
 if __name__ == '__main__':
 
-    lnode = load_node()
+    node = load_node(1056)
+    testdir = 'testdir'
+    Path(testdir).mkdir(parents=True, exist_ok=True)
+    # get the parameters from the lattice calculations
+    parameters = node.inputs.parameters.get_dict()
+    parameters['incar']['ldipol'] = True
+    parameters['incar']['idipol'] = 3
+    parameters['incar']['dipol'] = [0.5, 0.5, 0.5]
+    
+    structure = node.outputs.relax.structure
+    ase_structure = structure.get_ase()
+    a = np.linalg.norm(ase_structure.cell[0])
+    unit_cell = build.bulk( 'Au', 'fcc', a=a)
 
-    lparameters = lnode.inputs.parameters
-    # relax only cell positions
-    lparameters['isif'] = 2
-    # create the dipole moment
-    lparameters['ldipole'] = True
-    lparameters['dipol'] = [0.5, 0.5, 0.5]
-    lparameters['idipol'] = 3
+    miller_index = (3, 1, 0)
+    facet = ''.join([str(elem) for elem in miller_index])
+    repeat_ndim = 2
+    layers = 11
+    
+    factors = [1, ]#2, 3, 4 ]
+    for factor in factors:
+        # generate the new structure
+        atoms = build.surface(unit_cell, miller_index, layers=layers, vacuum=8.0, periodic=True)
+        if repeat_ndim == 1:
+            atoms = atoms.repeat((factor, 1, 1))
+            kpoint_mesh = [np.ciel(12/factor), 12, 1]
+        elif repeat_ndim == 2:
+            atoms = atoms.repeat((factor, factor, 1))
+            kpoint_mesh = [np.ceil(12/factor), np.ceil(12/factor), 1]
 
-    factors = [2, 3, 4, 5, 6]
+        # constrain the bottom layers of the metal
+        all_z = [atom.position[2] for atom in atoms]
+        unique_z = np.sort(np.unique(all_z))
+        split_z = np.array_split(unique_z, 2)
+        dynamics_pos = []
+        for atom in atoms:
+            if atom.position[2] in split_z[1]:
+                dynamics_pos.append([True, True, True])
+            elif atom.position[2] in split_z[0]:
+                dynamics_pos.append([False, False, False])
+        dynamics = {'positions_dof': orm.List(list=dynamics_pos)}
+        runner(atoms, parameters, kpoint_mesh, dynamics)
+        
+        #atoms.center()
+        #atoms.write(f'{testdir}/{facet}_{factor}.cif')
+
+
