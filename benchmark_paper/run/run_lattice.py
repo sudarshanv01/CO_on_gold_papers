@@ -19,13 +19,17 @@ def calculator():
         'incar':{
             'encut': 500,
             'ismear': 0,
-            'sigma': 0.2,
+            'sigma': 0.1,
             'ibrion': 2,
             'ispin': 1,
             'lorbit': 11,
-            'nelm': 100,
+            'nelm': 250,
             'prec': 'Accurate',
-            'gga': 'RP',
+            #'ivdw': 11,
+            'ediff': 1e-7,
+            'gga': 'BF',
+            'zab_vdw': -1.8867,
+            'luse_vdw': True,
         }
 
     }
@@ -91,7 +95,7 @@ def runner(structure):
 
     calculation = submit( RelaxVasp, **builder)
     path = GroupPath()
-    path["lattices/RPBE"].get_group().add_nodes(calculation)
+    path["lattices/BEEF-vdW"].get_group().add_nodes(calculation)
 
 
 if __name__ == '__main__':
