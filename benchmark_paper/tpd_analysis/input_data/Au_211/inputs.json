@@ -1,0 +1,13 @@
+{
+	"beta": 3,
+	"T_max": 250,
+	"T_switch": 170,
+	"T_rate_min": [250, 300],
+	"correct_background": true,
+	"calculate_eq_coverage": true,
+	"order": 1,
+	"guess_b": [0.1,0.1],
+	"initial_guess_theta": 0.9,
+	"fit_quad_ads_ads": true
+
+}
