@@ -48,6 +48,17 @@ def runner_slab(structure, parameters, kpoint_mesh, dynamics=[]):
     kpoints.set_kpoints_mesh(kpoint_mesh)
     builder.kpoints = kpoints
 
+    total_k = kpoint_mesh[0] * kpoint_mesh[1]
+    if total_k % 4 == 0:
+        npar = 4
+    elif total_k % 3 == 0:
+        npar = 3
+    elif total_k % 2 == 0:
+        npar = 2
+
+    # Alter the parameters
+    parameters['incar']['npar'] = npar
+
     # set the parameters
     builder.parameters = orm.Dict(dict=parameters)
 
@@ -115,6 +126,17 @@ def runner_CO(structure, parameters, kpoint_mesh, dynamics=[]):
     kpoints = KpointsData()
     kpoints.set_kpoints_mesh(kpoint_mesh)
     builder.kpoints = kpoints
+
+    total_k = kpoint_mesh[0] * kpoint_mesh[1]
+    if total_k % 4 == 0:
+        npar = 4
+    elif total_k % 3 == 0:
+        npar = 3
+    elif total_k % 2 == 0:
+        npar = 2
+
+    # Alter the parameters
+    parameters['incar']['npar'] = npar
 
     # set the parameters
     builder.parameters = orm.Dict(dict=parameters)
@@ -188,41 +210,58 @@ if __name__ == '__main__':
     structure = latticenode.outputs.relax.structure
     ase_structure = structure.get_ase()
     a = np.linalg.norm(ase_structure.cell[0])
+
     unit_cell = build.bulk( 'Au', 'fcc', a=a)
     kpoints_lattice = latticenode.inputs.kpoints.get_kpoints_mesh()[0]
-    # special for 310
-    kpoints_lattice[0] = kpoints_lattice[0] / 3
 
-    miller_index = (3, 1, 0)
-    layers = 12
+    # special for 310
+    # kpoints_lattice[0] = kpoints_lattice[0] / 3
+
+    miller_index = (2, 1, 1)
+    layers = 8
     facet = ''.join([str(elem) for elem in miller_index])
-    
-    factors = [ 
-                #[1, 1],
-                #[1, 2],
-                #[1, 3],
-                [1, 4],
-                [1, 5],
-            ]
+
+    # Factors for 310 calculation 
+    # factors = [ 
+    #             [1, 1],
+    #             [1, 2],
+    #             [1, 3],
+    #             [1, 4],
+    #             [1, 5],
+    #         ]
+    # Factors for 211 calculation
+    factors = [
+                [3, 1],
+                [3, 2],
+                [3, 3],
+                [3, 4],
+                [3, 5],
+        ] 
         
 
     for factor in factors:
         # generate the new structure
-        atoms = build.surface(unit_cell, miller_index, layers=layers, vacuum=15.0, periodic=True)
-        atoms = atoms.repeat((factor[0], factor[1], 1))
+        # For 310
+        #atoms = build.surface(unit_cell, miller_index, layers=layers, vacuum=15.0, periodic=True)
+        #atoms = atoms.repeat((factor[0], factor[1], 1))
+
+        # For 211
+        atoms = build.fcc211('Au',a=a, size=factor+[4], vacuum=15.0, orthogonal=True) 
+        atoms.set_pbc([True, True, True])
+
         # decide which computer to use
         if len(atoms) < 20:
-            num_proc = 1
-            computer = 'dtu_xeon16'
-        elif len(atoms) < 40:
-            num_proc = 1
-            computer = 'dtu_xeon40'
-        elif len(atoms) < 60:
             num_proc = 2
-            computer = 'juwels'
+            computer = 'juwels_scr'
+        elif len(atoms) < 40:
+            num_proc = 4
+            computer = 'juwels_scr'
+        elif len(atoms) < 60:
+            num_proc = 4
+            computer = 'juwels_scr'
         else:
             num_proc = 4
-            computer = 'juwels'
+            computer = 'juwels_scr'
 
         repeat = 'x'.join([str(fac) for fac in factor])
 
