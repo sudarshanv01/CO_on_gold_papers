@@ -52,7 +52,7 @@ def runner(structure):
     builder.verbose = orm.Bool(True)
 
     # set the code
-    code = load_code('vasp-5.4.4@dtu_xeon8')
+    code = load_code('vasp.5.4.4-vdw@juwels_scr')
     builder.code = code
 
     # set the structure

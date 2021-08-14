@@ -25,9 +25,10 @@ def calculator():
             'lorbit': 11,
             'nelm': 250,
             'prec': 'Accurate',
-            'ivdw': 11,
             'ediff': 1e-7,
-            'gga': 'PE',
+            'gga': 'BF',
+            'zab_vdw': -1.8867,
+            'luse_vdw': True,
             'ldipol': True,
             'idipol': 4,
             'dipol':[0.5, 0.5, 0.5],   
@@ -52,7 +53,7 @@ def runner(structure):
     builder.verbose = orm.Bool(True)
 
     # set the code
-    code = load_code('vasp-5.4.4@dtu_xeon16')
+    code = load_code('vasp-5.4.4-vdw@juwels_scr')
     builder.code = code
 
     # set the structure
@@ -95,7 +96,7 @@ def runner(structure):
 
     calculation = submit( RelaxVasp, **builder)
     path = GroupPath()
-    path["references/PBE-D3"].get_group().add_nodes(calculation)
+    path["references/BEEF-vdW"].get_group().add_nodes(calculation)
 
 
 if __name__ == '__main__':

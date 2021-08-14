@@ -1,6 +1,5 @@
 import numpy as np
 from glob import glob
-from useful_functions import AutoVivification, get_vibrational_energy
 from pprint import pprint
 import os, sys
 from scipy.optimize import curve_fit
@@ -11,9 +10,10 @@ from ase.io import read
 from ase.db import connect
 import matplotlib
 from ase import units
+from ase import build 
 
 def get_gas_vibrations():
-    atoms = read('input_data/co.traj')
+    atoms = build.molecule('CO') 
     vibration_energies_gas = 0.00012 * np.array([2100.539983, 24.030662, 24.018143])
     thermo_gas = IdealGasThermo(vibration_energies_gas, atoms = atoms, \
             geometry='linear', symmetrynumber=1, spin=0)
@@ -181,6 +181,7 @@ class PlotDFT():
         all_theta = [] 
         all_n = []
         delta_zpe =  self.thermo_ads.get_ZPE_correction() - self.thermo_gas.get_ZPE_correction()
+        self.delta_zpe = delta_zpe
         free_ads = self.thermo_ads.get_helmholtz_energy(temperature=298.15, verbose=False)
         free_gas = self.thermo_gas.get_gibbs_energy(temperature=298.15, \
                                                     pressure=101325, verbose=False)

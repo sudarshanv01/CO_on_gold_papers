@@ -16,22 +16,26 @@ from scipy.optimize import curve_fit
 from matplotlib import cm
 import matplotlib.pyplot as plt
 from tpd_analyse.tpd import PlotTPD
-from plot_params import get_plot_params
-from useful_functions import create_output_directory
+from pathlib import Path
 import matplotlib
 from dft import PlotDFT
 from matplotlib.ticker import (MultipleLocator, FormatStrFormatter,
                                AutoMinorLocator)
 import string
-get_plot_params()
-create_output_directory()
+from ase import build
+try:
+    from plot_params import get_plot_params
+    get_plot_params()
+except Exception:
+    pass
+Path('output').mkdir(exist_ok=True)
 
 if __name__ == '__main__':
 
     fig1, ax1 = plt.subplots(2, 3, figsize=(14,8), squeeze=False)
     fig2, ax2 = plt.subplots(1, 2, figsize=(12.5,4.5), squeeze=False)
     fig3, ax3 = plt.subplots(1, 1, figsize=(7,5), squeeze=False)
-    fig4, ax4 = plt.subplots(1, 2, figsize=(10,5), squeeze=False)
+    fig4, ax4 = plt.subplots(1, 3, figsize=(14,5), squeeze=False)
 
     ## Supplementary information plots
     figS1, axS1 = plt.subplots(1, 2, figsize=(8,5), squeeze=False )
@@ -43,16 +47,17 @@ if __name__ == '__main__':
     ## We look at only two facets
     facets = ['211', '310']
     cmap_facet = {'211':'Blues', '310':'Oranges'}
-    # correct_background = {'211':True, '310':False}
+
     ## Optional: Image to put next to the TPD plot
     image_data = {'211':plt.imread('surface_sites/gold_211.png'),
                   '310':plt.imread('surface_sites/gold_310.png')}
     ## gas atoms
-    atoms = read('input_data/co.traj')
+    atoms = build.molecule('CO')
     thermo_gas = 0.00012 * np.array([2100.539983, 24.030662, 24.018143 ])
     vibration_energies_gas = IdealGasThermo(thermo_gas, atoms = atoms, \
             geometry='linear', symmetrynumber=1, spin=0)
     vibration_energies_ads = HarmonicThermo(0.00012 * np.array([2044.1, 282.2, 201.5, 188.5, 38.3, 11.5]))
+    functional_color = {'RPBE':'tab:cyan', 'PBE':'tab:olive', 'RPBE-D3':'tab:pink', 'PBE-D3':'tab:gray', 'BEEF-vdW':'tab:brown'}
 
     for index_facet, facet in enumerate(facets):
         ## Files with the different exposure
@@ -137,8 +142,6 @@ if __name__ == '__main__':
                             color=cmap(index_exposure), 
                             )
 
-        # ax2[0,0].plot([], [], 'o-',  label='Au(%s)'%facet, color=cmap(index_exposure))
-        # ax3[0,0].plot([], [], '-',  label='Au(%s)'%facet, color=cmap(index_exposure))
         for i in range(len(ax1)):
             ax1[i,1].set_xlabel(r'$\theta_{\mathregular{rel}}$')
             ax1[i,1].set_ylabel(r'$G_{\mathregular{d}}$ / eV')
@@ -151,7 +154,11 @@ if __name__ == '__main__':
         ax3[0,0].axvline(298.15, color='k', ls='--')
         ax3[0,0].set_ylabel(r'Equilibrium $\theta$ / ML')
         ax3[0,0].set_xlabel(r'Temperature / K')
-        ax4[0,0].axhspan(-1 * min(all_E0), -1 * max(all_E0), color=cmap(index_exposure), alpha=0.25, \
+        if facet == '211':
+            ax4[0,0].axhspan(-1 * min(all_E0), -1 * max(all_E0), color=cmap(index_exposure), alpha=0.25,
+                    label=r'$\Delta \mathregular{E}_{ \theta \to 0} \ \mathregular{Au}(%s)$'%facet)
+        elif facet == '310':
+            ax4[0,1].axhspan(-1 * min(all_E0), -1 * max(all_E0), color=cmap(index_exposure), alpha=0.25,
                     label=r'$\Delta \mathregular{E}_{ \theta \to 0} \ \mathregular{Au}(%s)$'%facet)
             
         for index_exposure, exposure in enumerate(sorted(TPDClass.results[surface_index])):
@@ -236,67 +243,99 @@ if __name__ == '__main__':
         a.annotate(alphabet[i]+')', xy=(-0.1, 1.1), xycoords='axes fraction', fontsize=20)
 
     fig1.tight_layout()
-    fig1.savefig(os.path.join('output/figure_1.pdf'))
+    fig1.savefig(os.path.join('output/figure_1.png'), dpi=450)
 
     fig2.tight_layout()
-    fig2.savefig(os.path.join('output/figure_2.pdf'))
+    fig2.savefig(os.path.join('output/figure_2.png'), dpi=450)
 
     fig3.tight_layout()
-    fig3.savefig(os.path.join('output/figure_3.pdf'))
+    fig3.savefig(os.path.join('output/figure_3.png'), dpi=450)
 
     figS1.tight_layout()
-    figS1.savefig(os.path.join('output/figure_S1.pdf'))
+    figS1.savefig(os.path.join('output/figure_S1.png'), dpi=450)
 
     figS2.tight_layout()
-    figS2.savefig(os.path.join('output/figure_S2.pdf'))
+    figS2.savefig(os.path.join('output/figure_S2.png'), dpi=450)
     
     figS3.tight_layout()
-    figS3.savefig(os.path.join('output/figure_S3.pdf'))
+    figS3.savefig(os.path.join('output/figure_S3.png'), dpi=450)
 
 
     """ Plotting DFT graphs """
-    dft_facets = ['211', '310', '111', '100', ]
-    colors_facet = {'211':'tab:blue',  '100':'tab:red',\
-                    '110':'tab:brown', 'recon_110':'tab:cyan', '111':'tab:green', 
-                    '310':'tab:orange'}
+    data_functional = json.load(open('input_data/energies.json', 'r'))
+    gas_vibrations = json.load(open('input_data/gas_phase_vib.json', 'r'))
+    ads_vibrations = json.load(open('input_data/vibrations.json', 'r'))
 
-    thermodb = connect('input_data/Au_CO_coverage.db')
-    referencedb = connect('input_data/gas_phase.db')
+    # Now plot data for the different functionals
+    for functional in data_functional:
+        for facet in ['211', '310']:
+            data_energies = data_functional[functional][facet]
+            data_energies = np.array(data_energies).T
+            data_energies = np.sort(data_energies)
+            # get the gas molecule vibrations for the right functional
+            gas_vib = np.array(gas_vibrations[functional])
+            # get the adsorbate vibrations for the right coverage
+            ads_vib = np.array(ads_vibrations[functional][facet]["1.0"])
+            ads_vib[ads_vib < 0] = 30 # replace negative values with 30
 
-    for index_facet, facet in enumerate(dft_facets):
-        dft_data = PlotDFT(database=thermodb,
-                reference_database=referencedb,
-                facet=facet,
-                functional='BF')
-        ax4[0,1].plot(dft_data.coverage, dft_data.dEdiff, \
-                marker='o', ls='--', color=colors_facet[facet], \
-                    label='Au('+facet+')')
-        ax4[0,0].plot(dft_data.coverage, dft_data.dEint, \
-                marker='o', ls='--', color=colors_facet[facet], \
-                    # label='Au('+facet+')', )
-        )
-        ax4[0,0].errorbar(dft_data.coverage, dft_data.dEint, dft_data.beef_error[facet], alpha=0.25,\
-             color=colors_facet[facet])
-        ax4[0,1].errorbar(dft_data.coverage, dft_data.dEdiff, dft_data.beef_error[facet],alpha=0.25,\
-              color=colors_facet[facet])
-        print(dft_data.dEint)
-        print(dft_data.dEdiff)
-    # handles, labels = ax4[0,0].get_legend_handles_labels()
+            cm_to_eV = 0.00012
+            # Free energies 
+            thermo_gas = IdealGasThermo(cm_to_eV * gas_vib[0:3], atoms = build.molecule('CO'), \
+                    geometry='linear', symmetrynumber=1, spin=0)
+            thermo_ads = HarmonicThermo(cm_to_eV * ads_vib)
 
-    # fig4.legend(handles, labels, bbox_to_anchor=(0,1.02,1,0.2), loc="lower left",
-                # mode="expand", borderaxespad=0, ncol=2)
-    ax4[0,1].axhline(y=0, color='k', ls='-')
-    ax4[0,0].set_xlabel(r'$\theta$ / ML')
+            delta_zpe = thermo_ads.get_ZPE_correction() - thermo_gas.get_ZPE_correction()
+            dG = thermo_ads.get_helmholtz_energy(298.15, verbose=False) - thermo_gas.get_gibbs_energy(298.15, 101325, verbose=False) 
+
+            diff_energies = []
+            for i in range(len(data_energies[0])-1):
+                if i == 0:
+                    diff_energies.append(0)
+                else:
+                    diff_energies.append(data_energies[1][i+1]-data_energies[1][i])
+            diff_energies = np.array(diff_energies)
+            diff_energies += data_energies[1][0]
+            diff_energies += dG 
+
+            if facet == '211': 
+                index = 0
+                line = '-'
+                marker = 'o'
+                ax4[0,index].plot(data_energies[0], data_energies[1]+delta_zpe, marker+line,  color=functional_color[functional])
+                ax4[0,2].plot(data_energies[0][:-1], diff_energies, marker+line, label=f'{functional} ({facet})', color=functional_color[functional])
+            elif facet == '310': 
+                index = 1
+                line = '--'
+                marker = 'v'
+                ax4[0,index].plot(data_energies[0], data_energies[1]+delta_zpe, marker+line,  color=functional_color[functional])
+                ax4[0,2].plot(data_energies[0][:-1], diff_energies, marker+line, label=f'{functional} ({facet})', color=functional_color[functional])
+            else: raise ValueError 
+
+
     ax4[0,0].set_ylabel(r'$\Delta \mathregular{E} + \Delta \mathregular{ZPE}$ / eV')
+    ax4[0,0].set_xlabel(r'$\theta$ / ML')
+    ax4[0,1].set_ylabel(r'$\Delta \mathregular{E} + \Delta \mathregular{ZPE}$ / eV')
     ax4[0,1].set_xlabel(r'$\theta$ / ML')
-    ax4[0,1].set_ylabel(r'$\Delta \mathregular{G}_{\mathregular{diff}}$ / eV')
+    ax4[0,2].set_ylabel(r'$\Delta G_\mathregular{diff}$ / eV') 
+    ax4[0,2].set_xlabel(r'$\theta$ / ML')
+
     ax4[0,0].axhline(-0.58, label='Redhead analysis', color='tab:purple', ls='-.')
-    ax4[0,1].legend(loc="best", frameon=False, fontsize=12)
-    ax4[0,0].legend(loc='upper left', frameon=False, fontsize=12)
+    ax4[0,1].axhline(-0.58, label='Redhead analysis', color='tab:purple', ls='-.')
+    ax4[0,2].axhline(-0.0, label='$\Delta G_{\mathregular{diff}}=0$', color='k', ls='-.')
+
+    ax4[0,0].set_ylim([-0.8, 0.1])
+    ax4[0,1].set_ylim([-0.8, 0.1])
+
+    ax4[0,0].legend(loc='best', fontsize=10)
+    ax4[0,1].legend(loc='best', fontsize=10)
+    ax4[0,2].legend(bbox_to_anchor=(1.04,1), loc="upper left", fontsize=10)
+    ax4[0,0].set_title('Au(211)',) 
+    ax4[0,1].set_title('Au(310)',) 
+
 
 
     for i, a in enumerate(ax4.flatten()):
-        a.annotate(alphabet[i]+')', xy=(-0.1, 1.1), xycoords='axes fraction', fontsize=20)
+        a.annotate(alphabet[i]+')', xy=(-0.12, 1.1), xycoords='axes fraction', fontsize=20)
 
     fig4.tight_layout()
-    fig4.savefig('output/figure_4.pdf')
+    fig4.savefig('output/figure_4.png', dpi=450)

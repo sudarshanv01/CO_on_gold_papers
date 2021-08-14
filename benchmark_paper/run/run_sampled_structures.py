@@ -35,7 +35,7 @@ def runner_slab(structure, parameters, kpoint_mesh, dynamics=[]):
     builder.verbose = orm.Bool(True)
 
     # set the code
-    code = load_code('vasp-5.4.4@'+computer)
+    code = load_code('vasp-5.4.4-vdw@'+computer)
     builder.code = code
 
     # set the structure
@@ -114,7 +114,7 @@ def runner_CO(structure, parameters, kpoint_mesh, dynamics=[]):
     builder.verbose = orm.Bool(True)
 
     # set the code
-    code = load_code('vasp-5.4.4@'+computer)
+    code = load_code('vasp-5.4.4-vdw@'+computer)
     builder.code = code
 
     # set the structure
@@ -218,20 +218,20 @@ if __name__ == '__main__':
     # kpoints_lattice[0] = kpoints_lattice[0] / 3
 
     miller_index = (2, 1, 1)
-    layers = 8
+    # layers = 8
     facet = ''.join([str(elem) for elem in miller_index])
 
     # Factors for 310 calculation 
     # factors = [ 
-    #             [1, 1],
-    #             [1, 2],
-    #             [1, 3],
-    #             [1, 4],
-    #             [1, 5],
-    #         ]
+                # [1, 1],
+            #     [1, 2],
+            #     [1, 3],
+            #     [1, 4],
+            #     [1, 5],
+            # ]
     # Factors for 211 calculation
     factors = [
-                [3, 1],
+                # [3, 1],
                 [3, 2],
                 [3, 3],
                 [3, 4],
@@ -242,8 +242,8 @@ if __name__ == '__main__':
     for factor in factors:
         # generate the new structure
         # For 310
-        #atoms = build.surface(unit_cell, miller_index, layers=layers, vacuum=15.0, periodic=True)
-        #atoms = atoms.repeat((factor[0], factor[1], 1))
+        # atoms = build.surface(unit_cell, miller_index, layers=layers, vacuum=15.0, periodic=True)
+        # atoms = atoms.repeat((factor[0], factor[1], 1))
 
         # For 211
         atoms = build.fcc211('Au',a=a, size=factor+[4], vacuum=15.0, orthogonal=True) 
